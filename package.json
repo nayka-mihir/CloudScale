@@ -1,0 +1,12 @@
+{
+  "name": "aws-cloudscale-project",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AWS CloudScale High-Availability and Auto-Scaling Platform",
+  "scripts": {
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "build:frontend": "npm run build --prefix frontend",
+    "install:all": "npm install --prefix frontend && npm install --prefix backend"
+  }
+}

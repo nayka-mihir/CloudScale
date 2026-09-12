@@ -1,0 +1,20 @@
+{
+  "name": "cloudscale-backend",
+  "version": "1.0.0",
+  "description": "CloudScale AWS Auto-Scaling and Infrastructure API",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-auto-scaling": "^3.750.0",
+    "@aws-sdk/client-cloudwatch": "^3.750.0",
+    "@aws-sdk/client-ec2": "^3.750.0",
+    "@aws-sdk/client-elastic-load-balancing-v2": "^3.750.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}
