@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cloud, Activity, Server, Globe, Sun, Moon } from 'lucide-react';
+import { Cloud, Activity, Globe, Sun, Moon, ShieldCheck, Lock, LogOut } from 'lucide-react';
 
 export default function Navbar({ 
   activeTab, 
@@ -8,7 +8,9 @@ export default function Navbar({
   setActiveApp, 
   clusterSummary,
   theme,
-  toggleTheme
+  toggleTheme,
+  adminUser,
+  onLogout
 }) {
   const isLight = theme !== 'dark';
 
@@ -122,11 +124,31 @@ export default function Navbar({
                 }`}
                 title="admin.cloudscale.com (Admin Dashboard)"
               >
-                <Server className={`w-3.5 h-3.5 ${isLight ? 'text-red-500' : 'text-slate-400'}`} />
+                {adminUser ? (
+                  <ShieldCheck className={`w-3.5 h-3.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`} />
+                ) : (
+                  <Lock className={`w-3.5 h-3.5 ${isLight ? 'text-amber-600' : 'text-amber-400'}`} />
+                )}
                 <span className="hidden sm:inline">admin.cloudscale.com</span>
                 <span className="sm:hidden">Admin</span>
               </button>
             </div>
+
+            {/* Logout shortcut if admin is logged in */}
+            {adminUser && onLogout && (
+              <button
+                onClick={onLogout}
+                className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-center ${
+                  isLight
+                    ? 'border-gray-200 bg-white text-rose-600 hover:bg-rose-50 shadow-xs'
+                    : 'border-slate-800 bg-slate-900 text-rose-400 hover:bg-rose-950/40'
+                }`}
+                title="Lock Admin Session / Sign Out"
+                aria-label="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
 
             {/* Theme Switcher Button */}
             <button

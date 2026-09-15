@@ -11,7 +11,9 @@ export default function MainLayout({
   clusterSummary, 
   toastMessage,
   theme,
-  toggleTheme
+  toggleTheme,
+  adminUser,
+  onLogout
 }) {
   return (
     <div className={`min-h-screen flex flex-col transition-colors duration-200 ${
@@ -38,6 +40,8 @@ export default function MainLayout({
         clusterSummary={clusterSummary}
         theme={theme}
         toggleTheme={toggleTheme}
+        adminUser={adminUser}
+        onLogout={onLogout}
       />
 
       {/* Page Content */}

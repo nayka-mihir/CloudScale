@@ -12,11 +12,11 @@ import {
   AlertTriangle,
   RefreshCw,
   Plus,
-  Minus
+  Minus,
+  LogOut,
+  UserCheck
 } from 'lucide-react';
 import { 
-  LineChart, 
-  Line, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -25,9 +25,14 @@ import {
   AreaChart, 
   Area 
 } from 'recharts';
-import axios from 'axios';
+import { 
+  scaleIncrease, 
+  scaleDecrease, 
+  startLoadTest, 
+  stopLoadTest 
+} from '../services/api';
 
-export default function AdminDashboard({ metrics, refreshMetrics, triggerNotification }) {
+export default function AdminDashboard({ metrics, refreshMetrics, triggerNotification, adminUser, onLogout }) {
   const [actionLoading, setActionLoading] = useState(false);
 
   const summary = metrics?.summary || {
@@ -52,8 +57,8 @@ export default function AdminDashboard({ metrics, refreshMetrics, triggerNotific
   const handleCapacityChange = async (action) => {
     setActionLoading(true);
     try {
-      const res = await axios.post('/api/capacity', { action });
-      triggerNotification(res.data.message || `Capacity action ${action} executed successfully`);
+      const res = action === 'increase' ? await scaleIncrease() : await scaleDecrease();
+      triggerNotification(res.message || `Capacity action ${action} executed successfully`);
       refreshMetrics();
     } catch (err) {
       triggerNotification(err.response?.data?.error || `Failed to ${action} capacity`);
@@ -66,11 +71,11 @@ export default function AdminDashboard({ metrics, refreshMetrics, triggerNotific
     setActionLoading(true);
     try {
       if (summary.loadTestActive) {
-        const res = await axios.post('/api/load-test/stop');
-        triggerNotification(res.data.message);
+        const res = await stopLoadTest();
+        triggerNotification(res.message);
       } else {
-        const res = await axios.post('/api/load-test/start');
-        triggerNotification(res.data.message);
+        const res = await startLoadTest();
+        triggerNotification(res.message);
       }
       refreshMetrics();
     } catch (err) {
@@ -85,11 +90,20 @@ export default function AdminDashboard({ metrics, refreshMetrics, triggerNotific
       {/* Header & Sub-domain banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200 dark:border-slate-800/80 pb-6">
         <div>
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
             <span className="font-mono text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2.5 py-1 rounded border border-indigo-200 dark:border-indigo-500/20 font-medium">
               admin.cloudscale.com
             </span>
             <span className="text-xs text-slate-400 dark:text-slate-500 font-mono">Control Plane v1.0</span>
+
+            {/* Authenticated Admin Pill */}
+            {adminUser && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400">
+                <UserCheck className="w-3 h-3" />
+                <span>{adminUser.username}</span>
+                <span className="text-slate-400">({adminUser.role || 'Admin'})</span>
+              </span>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
             Infrastructure Overview
@@ -150,6 +164,17 @@ export default function AdminDashboard({ metrics, refreshMetrics, triggerNotific
           >
             <RefreshCw className="w-4 h-4" />
           </button>
+
+          {onLogout && (
+            <button
+              onClick={onLogout}
+              className="px-3 py-2 rounded-xl bg-gray-100 hover:bg-rose-50 dark:bg-slate-800 dark:hover:bg-rose-950/40 text-gray-700 hover:text-rose-600 dark:text-slate-300 dark:hover:text-rose-400 border border-gray-200 dark:border-slate-700 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
+              title="Lock Admin Session and Sign Out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Lock / Sign Out</span>
+            </button>
+          )}
         </div>
       </div>
 
