@@ -1,0 +1,40 @@
+# ==============================================================================
+# CloudScale — Docker Ignore File
+# Prevents bulky, sensitive, or redundant files from being copied into images
+# ==============================================================================
+
+# Node dependencies & logs (re-installed cleanly during Docker build)
+**/node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs (rebuilt fresh inside frontend-builder stage)
+**/dist
+**/build
+**/.vite
+
+# Version control & IDE configuration
+.git
+.gitignore
+.vscode
+.idea
+
+# Documentation & project guides
+*.md
+!README.md
+docs/
+
+# Secrets & environment configurations
+**/.env
+**/.env.*
+!**/.env.example
+
+# Terraform cache & infrastructure state
+infrastructure/.terraform
+infrastructure/*.tfstate*
+infrastructure/*.tfvars
+
+# Operating system files
+.DS_Store
+Thumbs.db

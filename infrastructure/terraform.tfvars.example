@@ -1,0 +1,22 @@
+# ==============================================================================
+# CloudScale Terraform Input Variables
+# Rename this file to "terraform.tfvars" to apply custom settings
+# ==============================================================================
+
+aws_region       = "ap-south-1"
+instance_type    = "t3.micro"
+key_name         = "cloudscale-key"
+
+# (Optional) If you already created your Golden AMI in AWS, paste its ID here:
+# ami_id         = "ami-0123456789abcdef0"
+
+# Admin SSH Access (Replace with your actual public IP, e.g. "203.0.113.25/32")
+admin_ssh_cidr   = "0.0.0.0/0"
+
+# Fleet Sizing
+min_capacity     = 2
+desired_capacity = 2
+max_capacity     = 6
+
+# Auto Scaling Threshold
+cpu_target_threshold = 70

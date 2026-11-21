@@ -12,22 +12,21 @@
 1. [STEP 0: FIRST CREATE THIS (Prerequisites, Keys & IAM Role)](#step-0-first-create-this)
 2. [STEP 1: Create VPC & Multi-AZ Networking Infrastructure](#step-1-create-vpc--multi-az-networking)
 3. [STEP 2: Create Security Groups (Chained Firewall Rules)](#step-2-create-security-groups)
-4. [STEP 3: Create Amazon EFS (Elastic File System for Shared Storage)](#step-3-create-amazon-efs)
-5. [STEP 4: Launch Base EC2 Instance (Base Setup Server)](#step-4-launch-base-ec2-instance)
-6. [STEP 5: SSH into Base EC2 & Install Software (Docker, Git, EFS Utils)](#step-5-install-software-on-base-instance)
-7. [STEP 6: Deploy CloudScale Code & Launch Containers](#step-6-deploy-cloudscale-containers)
-8. [STEP 7: Test & Verify Website 1, Website 2 & API on Base Instance](#step-7-test--verify-applications)
-9. [STEP 8: Configure Auto-Start Service & Create Golden AMI](#step-8-create-the-golden-ami)
-10. [STEP 9: Create Target Groups (Port 80 & Port 8080)](#step-9-create-target-groups)
-11. [STEP 10: Create Application Load Balancer (ALB)](#step-10-create-application-load-balancer)
-12. [STEP 11: Create EC2 Launch Template (with Automated User Data)](#step-11-create-launch-template)
-13. [STEP 12: Create Auto Scaling Group (ASG) with Target Tracking](#step-12-create-auto-scaling-group)
-14. [STEP 13: Verify Initial Baseline Fleet (2 Healthy Multi-AZ Instances)](#step-13-verify-baseline-fleet)
-15. [STEP 14: Trigger Live CPU Stress Test & Observe Auto-Scaling Live](#step-14-trigger-live-auto-scaling)
-16. [STEP 15: Stop Stress Test & Observe Cooldown & Scale-In](#step-15-observe-cooldown--scale-in)
-17. [STEP 16: Chaos Engineering Lab (Kill Instance & Prove Zero Downtime)](#step-16-chaos-engineering-lab)
-18. [STEP 17: How to Safely Pause / Terminate Resources to Save Costs](#step-17-cost-control--cleanup)
-19. [STEP 18: Project Viva / Professor Demonstration Script](#step-18-professor-demo-script)
+4. [STEP 3: Launch Base EC2 Instance (Base Setup Server)](#step-3-launch-base-ec2-instance)
+5. [STEP 4: SSH into Base EC2 & Install Software (Docker, Git)](#step-4-install-software-on-base-instance)
+6. [STEP 5: Deploy CloudScale Code & Launch Containers](#step-5-deploy-cloudscale-containers)
+7. [STEP 6: Test & Verify Website 1, Website 2 & API on Base Instance](#step-6-test--verify-applications)
+8. [STEP 7: Configure Auto-Start Service & Create Golden AMI](#step-7-create-the-golden-ami)
+9. [STEP 8: Create Target Groups (Port 80 & Port 8080)](#step-8-create-target-groups)
+10. [STEP 9: Create Application Load Balancer (ALB)](#step-9-create-application-load-balancer)
+11. [STEP 10: Create EC2 Launch Template (with Automated User Data)](#step-10-create-launch-template)
+12. [STEP 11: Create Auto Scaling Group (ASG) with Target Tracking](#step-11-create-auto-scaling-group)
+13. [STEP 12: Verify Initial Baseline Fleet (2 Healthy Multi-AZ Instances)](#step-12-verify-baseline-fleet)
+14. [STEP 13: Trigger Live CPU Stress Test & Observe Auto-Scaling Live](#step-13-trigger-live-auto-scaling)
+15. [STEP 14: Stop Stress Test & Observe Cooldown & Scale-In](#step-14-observe-cooldown--scale-in)
+16. [STEP 15: Chaos Engineering Lab (Kill Instance & Prove Zero Downtime)](#step-15-chaos-engineering-lab)
+17. [STEP 16: How to Safely Pause / Terminate Resources to Save Costs](#step-16-cost-control--cleanup)
+18. [STEP 17: Project Viva / Professor Demonstration Script](#step-17-professor-demo-script)
 
 ---
 
@@ -132,22 +131,7 @@ docker run -d \
   ```
 - **Expected Result**: Git outputs `Everything up-to-date` or lists pushed commits to `github.com/nayka-mihir/CloudScale.git`.
 
----
 
-### 0.3: Create EC2 SSH Key Pair
-- **Where**: AWS Console ➔ Search **EC2** ➔ Click **Key Pairs** (left sidebar under Network & Security).
-- **Who**: Cloud Admin
-- **Click-by-Click Instructions**:
-  1. Click **Create key pair** (orange button top right).
-  2. **Name**: `cloudscale-key`
-  3. **Key pair type**: `RSA`
-  4. **Private key file format**:
-     - Select `.pem` (if using macOS, Linux, or Windows PowerShell/Git Bash).
-     - Select `.ppk` (if using PuTTY).
-  5. Click **Create key pair**.
-  6. The file `cloudscale-key.pem` will automatically download to your Downloads folder. **Keep this file safe!**
-
----
 
 ### 0.3: Create IAM Policy & EC2 Instance Profile
 This allows the backend running on EC2 to query CloudWatch metrics and trigger Auto Scaling capacity without hardcoding secret keys.
@@ -164,53 +148,49 @@ This allows the backend running on EC2 to query CloudWatch metrics and trigger A
 
 ```json
 {
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "AutoScalingTelemetryAndControl",
-      "Effect": "Allow",
-      "Action": [
-        "autoscaling:DescribeAutoScalingGroups",
-        "autoscaling:DescribeAutoScalingInstances",
-        "autoscaling:DescribeScalingActivities",
-        "autoscaling:SetDesiredCapacity"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "CloudWatchMetricsAccess",
-      "Effect": "Allow",
-      "Action": [
-        "cloudwatch:GetMetricData",
-        "cloudwatch:GetMetricStatistics",
-        "cloudwatch:DescribeAlarms",
-        "cloudwatch:ListMetrics"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "EC2MetadataAccess",
-      "Effect": "Allow",
-      "Action": [
-        "ec2:DescribeInstances",
-        "ec2:DescribeAvailabilityZones",
-        "ec2:DescribeTargetGroups",
-        "ec2:DescribeTargetHealth"
-      ],
-      "Resource": "*"
-    },
-    {
-      "Sid": "EFSClientAccess",
-      "Effect": "Allow",
-      "Action": [
-        "elasticfilesystem:DescribeFileSystems",
-        "elasticfilesystem:DescribeMountTargets",
-        "elasticfilesystem:ClientMount",
-        "elasticfilesystem:ClientWrite"
-      ],
-      "Resource": "*"
-    }
-  ]
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+    		"Sid": "AutoScalingTelemetryAndControl",
+    		"Effect": "Allow",
+    		"Action": [
+        		"autoscaling:DescribeAutoScalingGroups",
+        		"autoscaling:DescribeAutoScalingInstances",
+        		"autoscaling:DescribeScalingActivities",
+        		"autoscaling:SetDesiredCapacity"
+    		],
+    		"Resource": "*"
+    	},
+		{
+			"Sid": "CloudWatchMetricsAccess",
+			"Effect": "Allow",
+			"Action": [
+        		"cloudwatch:GetMetricData",
+        		"cloudwatch:GetMetricStatistics",
+        		"cloudwatch:DescribeAlarms",
+        		"cloudwatch:ListMetrics"
+    		],
+			"Resource": "*"
+		},
+		{
+    		"Sid": "EC2MetadataAccess",
+    		"Effect": "Allow",
+    		"Action": [
+        		"ec2:DescribeInstances",
+        		"ec2:DescribeAvailabilityZones"
+    		],
+    		"Resource": "*"
+    	},
+    	{
+    		"Sid": "ELBTargetGroupAccess",
+    		"Effect": "Allow",
+    		"Action": [
+        		"elasticloadbalancing:DescribeTargetGroups",
+    			"elasticloadbalancing:DescribeTargetHealth"
+    		],
+    		"Resource": "*"
+    	}
+	]
 }
 ```
 6. Click **Next**. Name the policy: `CloudScale-Backend-Policy`.
@@ -222,6 +202,25 @@ This allows the backend running on EC2 to query CloudWatch metrics and trigger A
 - **Expected Result**: Role `CloudScale-EC2-Instance-Role` appears in IAM with `CloudScale-Backend-Policy` attached.
 
 ---
+
+
+---
+
+### 0.3.1: Create EC2 SSH Key Pair
+- **Where**: AWS Console ➔ Search **EC2** ➔ Click **Key Pairs** (left sidebar under Network & Security).
+- **Who**: Cloud Admin
+- **Click-by-Click Instructions**:
+  1. Click **Create key pair** (orange button top right).
+  2. **Name**: `cloudscale-key`
+  3. **Key pair type**: `RSA`
+  4. **Private key file format**:
+     - Select `.pem` (if using macOS, Linux, or Windows PowerShell/Git Bash).
+     - Select `.ppk` (if using PuTTY).
+  5. Click **Create key pair**.
+  6. The file `cloudscale-key.pem` will automatically download to your Downloads folder. **Keep this file safe!**
+
+---
+
 
 <a name="step-1-create-vpc--multi-az-networking"></a>
 ## 🌐 STEP 1: Create VPC & Multi-AZ Networking
@@ -244,7 +243,7 @@ We need an isolated Virtual Private Cloud across two Availability Zones (`ap-sou
 ### 1.2: Create Internet Gateway (IGW)
 - **Where**: VPC Console ➔ **Internet Gateways** ➔ Click **Create internet gateway**.
 - **Settings**:
-  - **Name tag**: `cloudscale-igw`
+  - **Name tag**: `cloudscale-iwg`
   - Click **Create internet gateway**.
 - **Attach to VPC**:
   - Click **Actions** ➔ **Attach to VPC**.
@@ -288,6 +287,72 @@ We need an isolated Virtual Private Cloud across two Availability Zones (`ap-sou
   - Click **Save associations**.
 - **Expected Result**: Traffic destined for `0.0.0.0/0` routes through `cloudscale-igw` across both subnets.
 
+
+
+### 1.4: Create Two Private Subnets (Multi-AZ)
+- **Where**: VPC Console ➔ **Subnets** ➔ Click **Create subnet**.
+- **Settings**:
+  - **VPC ID**: Select `cloudscale-vpc`.
+  - **Private Subnet 1**:
+    - **Subnet name**: `cloudscale-priv-sub-1`
+    - **Availability Zone**: Select `ap-south-1a` (same AZ as Public Subnet 1)
+    - **IPv4 CIDR block**: `10.0.3.0/24`
+  - Click **Add new subnet** (scroll down).
+  - **Private Subnet 2**:
+    - **Subnet name**: `cloudscale-priv-sub-2`
+    - **Availability Zone**: Select `ap-south-1b` (same AZ as Public Subnet 2)
+    - **IPv4 CIDR block**: `10.0.4.0/24`
+  - Click **Create subnet**.
+- **Note**: Do **NOT** enable auto-assign public IP on private subnets.
+
+---
+
+### 1.5: Allocate Elastic IP & Create NAT Gateway
+*(Allows private EC2 instances to download Docker images and packages while remaining hidden from inbound internet traffic)*
+
+1. **Allocate Elastic IP**:
+   - Go to **VPC Console** ➔ **Elastic IPs** (under Virtual Private Cloud).
+   - Click **Allocate Elastic IP address**.
+   - **Tag Name**: `cloudscale-nat-eip`.
+   - Click **Allocate**.
+
+2. **Create NAT Gateway**:
+   - Go to **VPC Console** ➔ **NAT Gateways** ➔ Click **Create NAT gateway**.
+   - **Name**: `cloudscale-nat-gw`
+   - **Subnet**: Select `cloudscale-pub-sub-1` *(NAT Gateways MUST reside in a Public Subnet!)*
+   - **Connectivity type**: `Public`
+   - **Elastic IP allocation ID**: Select the Elastic IP allocated above (`cloudscale-nat-eip`).
+   - Click **Create NAT gateway**.
+   - ⏳ *Wait 1–2 minutes until State changes from `Pending` to `Available`.*
+
+---
+
+### 1.6: Configure Private Route Table (Route to NAT Gateway)
+1. **Create Private Route Table**:
+   - Go to **VPC Console** ➔ **Route tables** ➔ Click **Create route table**.
+   - **Name**: `cloudscale-private-rt` (or edit the default Main Route Table).
+   - **VPC**: Select `cloudscale-vpc`.
+   - Click **Create route table**.
+
+2. **Add Route to NAT Gateway**:
+   - Select `cloudscale-private-rt` ➔ Click **Routes** tab ➔ Click **Edit routes**.
+   - Click **Add route**:
+     - **Destination**: `0.0.0.0/0`
+     - **Target**: Select **NAT Gateway** ➔ Select `cloudscale-nat-gw`.
+   - Click **Save changes**.
+
+3. **Associate Private Subnets**:
+   - Click **Subnet associations** tab ➔ Click **Edit subnet associations**.
+   - Select both:
+     - `cloudscale-priv-sub-1`
+     - `cloudscale-priv-sub-2`
+   - Click **Save associations**.
+
+- **Expected Result**: 
+  - Public Subnets (`10.0.1.0/24`, `10.0.2.0/24`) route through `cloudscale-igw` (ALB / Public facing).
+  - Private Subnets (`10.0.3.0/24`, `10.0.4.0/24`) route through `cloudscale-nat-gw` (Secure EC2 instances).
+
+
 ---
 
 <a name="step-2-create-security-groups"></a>
@@ -321,41 +386,13 @@ We use **Security Group Chaining**: EC2 compute nodes only accept traffic from t
     - Rule 4: Type `SSH` | Port `22` | Source: Select `My IP` (allows you to SSH from your machine).
   - Click **Create security group**.
 
-### 2.3: Create EFS Security Group (`cloudscale-efs-sg`)
-- **Where**: EC2 Console ➔ **Security Groups** ➔ Click **Create security group**.
-- **Settings**:
-  - **Security group name**: `cloudscale-efs-sg`
-  - **Description**: `NFS access from EC2 instances`
-  - **VPC**: Select `cloudscale-vpc`
-  - **Inbound rules**:
-    - Rule 1: Type `NFS` | Port `2049` | Source: Select `cloudscale-ec2-sg`.
-  - Click **Create security group**.
+---
+
 
 ---
 
-<a name="step-3-create-amazon-efs"></a>
-## 💾 STEP 3: Create Amazon EFS (Elastic File System)
-
-- **Where**: AWS Console ➔ Search **EFS** ➔ Click **Create file system**.
-- **Who**: Cloud Admin
-- **Click-by-Click Instructions**:
-  1. Click **Customize** (do not use the quick create pop-up).
-  2. **Name**: `cloudscale-efs`
-  3. **Storage class**: Standard (Multi-AZ).
-  4. Automatic backups: Optional (uncheck to save free tier storage).
-  5. Click **Next** to **Network access**:
-     - **VPC**: Select `cloudscale-vpc`.
-     - Under **Mount targets**:
-       - Row 1 (`ap-south-1a`): Subnet = `cloudscale-pub-sub-1`. Remove default SG ➔ Select **`cloudscale-efs-sg`**.
-       - Row 2 (`ap-south-1b`): Subnet = `cloudscale-pub-sub-2`. Remove default SG ➔ Select **`cloudscale-efs-sg`**.
-  6. Click **Next** ➔ **Next** ➔ **Create**.
-  7. Wait 1 minute until File system status is **Available**.
-  8. **Note down your File System ID**: (e.g., `fs-0abcd1234ef56789a`).
-
----
-
-<a name="step-4-launch-base-ec2-instance"></a>
-## 🖥️ STEP 4: Launch Base EC2 Instance (Base Setup Server)
+<a name="step-3-launch-base-ec2-instance"></a>
+## 🖥️ STEP 3: Launch Base EC2 Instance (Base Setup Server)
 
 We launch ONE base instance to install Docker, clone our repo, verify our containers, and capture the Golden AMI.
 
@@ -377,10 +414,10 @@ We launch ONE base instance to install Docker, clone our repo, verify our contai
 
 ---
 
-<a name="step-5-install-software-on-base-instance"></a>
-## ⚙️ STEP 5: SSH into Base EC2 & Install Software
+<a name="step-4-install-software-on-base-instance"></a>
+## ⚙️ STEP 4: SSH into Base EC2 & Install Software
 
-### 5.1: Connect via SSH
+### 4.1: Connect via SSH
 Open PowerShell, Git Bash, or Terminal on your local machine:
 
 ```bash
@@ -395,15 +432,15 @@ ssh -i "cloudscale-key.pem" ec2-user@<EC2_PUBLIC_IP>
 ```
 *Replace `<EC2_PUBLIC_IP>` with the public IP of your `CloudScale-Base-Setup-Server`.*
 
-### 5.2: Install Software Packages
+### 4.2: Install Software Packages
 Run these commands inside the EC2 terminal:
 
 ```bash
 # 1. Update system packages
 sudo yum update -y
 
-# 2. Install Git, Docker, and Amazon EFS Mount Helper
-sudo yum install -y git docker amazon-efs-utils
+# 2. Install Git and Docker
+sudo yum install -y git docker
 
 # 3. Start Docker daemon and enable it to boot on startup
 sudo systemctl enable docker
@@ -426,33 +463,19 @@ docker compose version
 
 ---
 
-<a name="step-6-deploy-cloudscale-containers"></a>
-## 📦 STEP 6: Deploy CloudScale Code & Launch Containers
+<a name="step-5-deploy-cloudscale-containers"></a>
+## 📦 STEP 5: Deploy CloudScale Code & Launch Containers
 
 Still inside your EC2 terminal:
 
-### 6.1: Clone the GitHub Repository
+### 5.1: Clone the GitHub Repository
 ```bash
 cd /home/ec2-user
 git clone https://github.com/nayka-mihir/CloudScale.git
 cd CloudScale
 ```
 
-### 6.2: Mount EFS Shared Directory
-```bash
-# Create shared storage directory
-sudo mkdir -p /mnt/efs/data
-sudo chown -R ec2-user:ec2-user /mnt/efs/data
-
-# Mount EFS (replace fs-xxxx with your EFS ID from Step 3)
-sudo mount -t efs -o tls fs-0abcd1234ef56789a:/ /mnt/efs/data
-
-# Verify mount
-df -h | grep efs
-```
-- **Expected Result**: Output shows `fs-0abcd...` mounted on `/mnt/efs/data` with 8.0 Exabytes available!
-
-### 6.3: Configure Backend Environment Variables
+### 5.2: Configure Backend Environment Variables
 ```bash
 cat <<EOF > /home/ec2-user/CloudScale/backend/.env
 PORT=5000
@@ -460,11 +483,10 @@ NODE_ENV=production
 AWS_REGION=ap-south-1
 AWS_ASG_NAME=cloudscale-asg
 SIMULATE_AWS=false
-EFS_STORAGE_PATH=/mnt/efs/data
 EOF
 ```
 
-### 6.4: Build and Start Containers
+### 5.3: Build and Start Containers
 
 You have two execution methods. **Option A is the recommended production approach** that directly binds to Port 80 and Port 8080 for the AWS ALB:
 
@@ -494,14 +516,14 @@ docker compose up -d --build
 
 ---
 
-<a name="step-7-test--verify-applications"></a>
-## ✅ STEP 7: Test & Verify Applications on Base Instance
+<a name="step-6-test--verify-applications"></a>
+## ✅ STEP 6: Test & Verify Applications on Base Instance
 
 Still inside EC2 terminal, test all three internal endpoints:
 
 ```bash
-# 1. Test Backend Health Check (Target Group check)
-curl -s http://localhost:5000/api/health
+# 1. Test Backend Health Check (Target Group check on Port 80)
+curl -s http://localhost:80/api/health
 # Expected: {"status":"healthy","uptime":...}
 
 # 2. Test Website 1 (Public Website on Port 80)
@@ -511,18 +533,22 @@ curl -I http://localhost:80
 # 3. Test Website 2 (Admin Dashboard on Port 8080)
 curl -I http://localhost:8080
 # Expected: HTTP/1.1 200 OK
+
+# 4. Test Website 2 Telemetry Health Check (Port 8080)
+curl -s http://localhost:8080/api/health
+# Expected: {"status":"healthy","uptime":...}
 ```
 
 If all 3 return `200 OK`, your container stack is completely operational!
 
 ---
 
-<a name="step-8-create-the-golden-ami"></a>
-## 🏆 STEP 8: Configure Auto-Start Service & Create Golden AMI
+<a name="step-7-create-the-golden-ami"></a>
+## 🏆 STEP 7: Configure Auto-Start Service & Create Golden AMI
 
 Every new instance launched by Auto Scaling must automatically run Docker and launch these containers on boot.
 
-### 8.1: Create Systemd Startup Service
+### 7.1: Create Systemd Startup Service
 Inside EC2 terminal:
 
 ```bash
@@ -535,9 +561,8 @@ After=docker.service network-online.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/home/ec2-user/CloudScale/docker
-ExecStart=/usr/local/lib/docker/cli-plugins/docker-compose up -d
-ExecStop=/usr/local/lib/docker/cli-plugins/docker-compose down
+ExecStart=/bin/sh -c "/usr/bin/docker start cloudscale || /usr/bin/docker run -d --name cloudscale --restart unless-stopped -p 80:80 -p 8080:8080 cloudscale-app:latest"
+ExecStop=/usr/bin/docker stop cloudscale
 TimeoutStartSec=0
 
 [Install]
@@ -554,7 +579,7 @@ history -c
 exit
 ```
 
-### 8.2: Create Golden AMI in AWS Console
+### 7.2: Create Golden AMI in AWS Console
 1. In the **AWS Console** ➔ **EC2** ➔ **Instances**.
 2. Select `CloudScale-Base-Setup-Server`.
 3. Click **Actions** ➔ **Image and templates** ➔ **Create image**.
@@ -569,12 +594,12 @@ exit
 
 ---
 
-<a name="step-9-create-target-groups"></a>
-## 🎯 STEP 9: Create Target Groups (Port 80 & Port 8080)
+<a name="step-8-create-target-groups"></a>
+## 🎯 STEP 8: Create Target Groups (Port 80 & Port 8080)
 
 We need two Target Groups: one for Website 1 (Port 80) and one for Website 2 (Port 8080).
 
-### 9.1: Target Group 1 (`tg-cloudscale-80`)
+### 8.1: Target Group 1 (`tg-cloudscale-80`)
 1. EC2 Console ➔ **Target Groups** ➔ Click **Create target group**.
 2. Target type: **Instances**.
 3. **Target group name**: `tg-cloudscale-80`.
@@ -590,7 +615,7 @@ We need two Target Groups: one for Website 1 (Port 80) and one for Website 2 (Po
      - Interval: `15` seconds
 7. Click **Next** ➔ Do **NOT** register targets manually ➔ Click **Create target group**.
 
-### 9.2: Target Group 2 (`tg-cloudscale-8080`)
+### 8.2: Target Group 2 (`tg-cloudscale-8080`)
 1. Click **Create target group**.
 2. Target type: **Instances**.
 3. **Target group name**: `tg-cloudscale-8080`.
@@ -602,8 +627,8 @@ We need two Target Groups: one for Website 1 (Port 80) and one for Website 2 (Po
 
 ---
 
-<a name="step-10-create-application-load-balancer"></a>
-## ⚖️ STEP 10: Create Application Load Balancer (ALB)
+<a name="step-9-create-application-load-balancer"></a>
+## ⚖️ STEP 9: Create Application Load Balancer (ALB)
 
 - **Where**: EC2 Console ➔ **Load Balancers** ➔ Click **Create load balancer**.
 - **Who**: Cloud Admin
@@ -629,8 +654,8 @@ We need two Target Groups: one for Website 1 (Port 80) and one for Website 2 (Po
 
 ---
 
-<a name="step-11-create-launch-template"></a>
-## 📄 STEP 11: Create EC2 Launch Template
+<a name="step-10-create-launch-template"></a>
+## 📄 STEP 10: Create EC2 Launch Template
 
 This defines the configuration template for new instances spawned by Auto Scaling.
 
@@ -651,22 +676,16 @@ This defines the configuration template for new instances spawned by Auto Scalin
     - **User data** (Paste this exact script):
       ```bash
       #!/bin/bash
-      # Mount EFS
-      mkdir -p /mnt/efs/data
-      mount -t efs -o tls fs-0abcd1234ef56789a:/ /mnt/efs/data
-      
-      # Start Docker & CloudScale containers
+      # Start Docker daemon & ensure CloudScale container runs
       systemctl start docker
-      cd /home/ec2-user/CloudScale/docker
-      /usr/local/lib/docker/cli-plugins/docker-compose up -d
+      docker start cloudscale || docker run -d --name cloudscale --restart unless-stopped -p 80:80 -p 8080:8080 cloudscale-app:latest
       ```
-      *(Replace `fs-0abcd...` with your actual EFS ID from Step 3).*
   - Click **Create launch template**.
 
 ---
 
-<a name="step-12-create-auto-scaling-group"></a>
-## 📈 STEP 12: Create Auto Scaling Group (ASG)
+<a name="step-11-create-auto-scaling-group"></a>
+## 📈 STEP 11: Create Auto Scaling Group (ASG)
 
 - **Where**: EC2 Console ➔ **Auto Scaling Groups** ➔ Click **Create Auto Scaling group**.
 - **Who**: Cloud Admin
@@ -703,8 +722,8 @@ This defines the configuration template for new instances spawned by Auto Scalin
 
 ---
 
-<a name="step-13-verify-baseline-fleet"></a>
-## 🔍 STEP 13: Verify Initial Baseline Fleet
+<a name="step-12-verify-baseline-fleet"></a>
+## 🔍 STEP 12: Verify Initial Baseline Fleet
 
 Wait 2 to 3 minutes for AWS to launch the cluster nodes:
 
@@ -722,8 +741,8 @@ Wait 2 to 3 minutes for AWS to launch the cluster nodes:
 
 ---
 
-<a name="step-14-trigger-live-auto-scaling"></a>
-## ⚡ STEP 14: Trigger Live CPU Stress Test & Observe Auto-Scaling Live
+<a name="step-13-trigger-live-auto-scaling"></a>
+## ⚡ STEP 13: Trigger Live CPU Stress Test & Observe Auto-Scaling Live
 
 This is the peak demonstration of your project.
 
@@ -748,8 +767,8 @@ This is the peak demonstration of your project.
 
 ---
 
-<a name="step-15-observe-cooldown--scale-in"></a>
-## ❄️ STEP 15: Stop Stress Test & Observe Cooldown & Scale-In
+<a name="step-14-observe-cooldown--scale-in"></a>
+## ❄️ STEP 14: Stop Stress Test & Observe Cooldown & Scale-In
 
 1. On the Admin Dashboard (`:8080`), click the green button: **`[Stop Load Test]`**.
 2. **Observe CPU Gauge**:
@@ -764,8 +783,8 @@ This is the peak demonstration of your project.
 
 ---
 
-<a name="step-16-chaos-engineering-lab"></a>
-## 💥 STEP 16: Chaos Engineering Lab (Prove Zero Downtime)
+<a name="step-15-chaos-engineering-lab"></a>
+## 💥 STEP 15: Chaos Engineering Lab (Prove Zero Downtime)
 
 Demonstrate to your evaluator that the cluster survives server crashes:
 
@@ -786,8 +805,8 @@ Demonstrate to your evaluator that the cluster survives server crashes:
 
 ---
 
-<a name="step-17-cost-control--cleanup"></a>
-## 💰 STEP 17: How to Safely Pause / Terminate Resources to Save Costs
+<a name="step-16-cost-control--cleanup"></a>
+## 💰 STEP 16: How to Safely Pause / Terminate Resources to Save Costs
 
 When you are done testing for the day, follow these steps to prevent any billing:
 
@@ -809,14 +828,12 @@ aws elbv2 delete-load-balancer --load-balancer-arn <ALB_ARN>
 aws elbv2 delete-target-group --target-group-arn <TG80_ARN>
 aws elbv2 delete-target-group --target-group-arn <TG8080_ARN>
 
-# d. Delete EFS:
-aws efs delete-file-system --file-system-id <EFS_ID>
 ```
 
 ---
 
-<a name="step-18-professor-demo-script"></a>
-## 🎓 STEP 18: Project Viva / Professor Demonstration Script
+<a name="step-17-professor-demo-script"></a>
+## 🎓 STEP 17: Project Viva / Professor Demonstration Script
 
 When presenting to your evaluator or professor, deliver this exact narrative:
 
@@ -831,6 +848,11 @@ When presenting to your evaluator or professor, deliver this exact narrative:
 
 4. **Demonstrate Cost Optimization (1 minute)**:
    > *"When I stop the stress test, the CPU drops back to 15%. After our cooldown window elapses, the ASG terminates the extra compute nodes, returning to our minimum baseline to minimize cloud hosting costs."*
+
+---
+
+5. **Architectural Defense (Why Stateless Architecture over EFS?)**:
+   > *"Professor, we intentionally designed CloudScale following the enterprise **12-Factor Stateless App** standard. Instead of mounting a shared network filesystem (Amazon EFS), our frontend and backend are compiled directly into an immutable Docker image on our Golden AMI. This eliminates network file-locking latency, avoids EFS pricing ($0.30/GB vs S3's $0.023/GB), prevents mount-timeout delays during boot, and ensures any EC2 node can be terminated instantly without state corruption."*
 
 ---
 *End of Sequential Working Execution Guide.*

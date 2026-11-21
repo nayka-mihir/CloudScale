@@ -1,0 +1,34 @@
+output "public_website_url" {
+  description = "URL for Website 1 (Public Portal & API) on Port 80"
+  value       = "http://${aws_lb.alb.dns_name}"
+}
+
+output "admin_dashboard_url" {
+  description = "URL for Website 2 (Admin Control Plane & Telemetry Cockpit) on Port 8080"
+  value       = "http://${aws_lb.alb.dns_name}:8080"
+}
+
+output "alb_dns_name" {
+  description = "Application Load Balancer Canonical DNS Name"
+  value       = aws_lb.alb.dns_name
+}
+
+output "vpc_id" {
+  description = "Custom CloudScale VPC ID"
+  value       = aws_vpc.main.id
+}
+
+output "asg_name" {
+  description = "Auto Scaling Group Name"
+  value       = aws_autoscaling_group.asg.name
+}
+
+output "launch_template_id" {
+  description = "EC2 Launch Template ID"
+  value       = aws_launch_template.lt.id
+}
+
+output "resolved_ami_id" {
+  description = "The AMI ID used to launch the cluster nodes"
+  value       = local.resolved_ami_id
+}

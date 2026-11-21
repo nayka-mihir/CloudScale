@@ -1,0 +1,463 @@
+terraform {
+  required_version = ">= 1.5.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = var.aws_region
+
+  default_tags {
+    tags = {
+      Project     = "CloudScale"
+      Environment = "Production"
+      ManagedBy   = "Terraform"
+    }
+  }
+}
+
+# ==============================================================================
+# 1. NETWORKING (VPC, Subnets, Internet Gateway & Routing)
+# ==============================================================================
+
+# Custom VPC (10.0.0.0/16)
+resource "aws_vpc" "main" {
+  cidr_block           = var.vpc_cidr
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+
+  tags = {
+    Name = "cloudscale-vpc"
+  }
+}
+
+# Internet Gateway
+resource "aws_internet_gateway" "igw" {
+  vpc_id = aws_vpc.main.id
+
+  tags = {
+    Name = "cloudscale-igw"
+  }
+}
+
+# Public Subnet 1 (ap-south-1a)
+resource "aws_subnet" "pub_1" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = var.subnet_1_cidr
+  availability_zone       = var.az_1
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "cloudscale-pub-sub-1"
+  }
+}
+
+# Public Subnet 2 (ap-south-1b)
+resource "aws_subnet" "pub_2" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = var.subnet_2_cidr
+  availability_zone       = var.az_2
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "cloudscale-pub-sub-2"
+  }
+}
+
+# Public Route Table
+resource "aws_route_table" "public" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.igw.id
+  }
+
+  tags = {
+    Name = "cloudscale-pub-rt"
+  }
+}
+
+# Route Table Associations
+resource "aws_route_table_association" "pub_1" {
+  subnet_id      = aws_subnet.pub_1.id
+  route_table_id = aws_route_table.public.id
+}
+
+resource "aws_route_table_association" "pub_2" {
+  subnet_id      = aws_subnet.pub_2.id
+  route_table_id = aws_route_table.public.id
+}
+
+# ==============================================================================
+# 2. SECURITY GROUPS (Strict Security Group Chaining)
+# ==============================================================================
+
+# ALB Security Group: Accepts public HTTP traffic on Port 80 and Port 8080
+resource "aws_security_group" "alb_sg" {
+  name        = "cloudscale-alb-sg"
+  description = "Security group for CloudScale Application Load Balancer"
+  vpc_id      = aws_vpc.main.id
+
+  # Public Website & API
+  ingress {
+    description = "Allow HTTP from internet"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Admin Dashboard & Cockpit
+  ingress {
+    description = "Allow Admin Cockpit HTTP from internet"
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Outbound allow-all
+  egress {
+    description = "Allow all outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "cloudscale-alb-sg"
+  }
+}
+
+# EC2 Security Group: ONLY accepts application traffic from ALB Security Group
+resource "aws_security_group" "ec2_sg" {
+  name        = "cloudscale-ec2-sg"
+  description = "Security group for CloudScale EC2 instances"
+  vpc_id      = aws_vpc.main.id
+
+  # Port 80 allowed ONLY from ALB SG
+  ingress {
+    description     = "Allow HTTP:80 exclusively from ALB Security Group"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  # Port 8080 allowed ONLY from ALB SG
+  ingress {
+    description     = "Allow HTTP:8080 exclusively from ALB Security Group"
+    from_port       = 8080
+    to_port         = 8080
+    protocol        = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+
+  # SSH for administration
+  ingress {
+    description = "Allow SSH from administrator CIDR"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.admin_ssh_cidr]
+  }
+
+  # Outbound allow-all
+  egress {
+    description = "Allow all outbound traffic"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "cloudscale-ec2-sg"
+  }
+}
+
+# ==============================================================================
+# 3. IDENTITY & ACCESS MANAGEMENT (IAM Role for EC2 Nodes)
+# ==============================================================================
+
+resource "aws_iam_role" "ec2_role" {
+  name = "CloudScale-EC2-Instance-Role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action    = "sts:AssumeRole"
+        Effect    = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name = "CloudScale-EC2-Instance-Role"
+  }
+}
+
+# CloudWatch Read Only Policy Attachment
+resource "aws_iam_role_policy_attachment" "cw_ro" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"
+}
+
+# Custom Least-Privilege Policy for Auto-Scaling and Metrics API
+resource "aws_iam_policy" "asg_policy" {
+  name        = "CloudScale-ASG-Telemetry-Policy"
+  description = "Permissions for CloudScale backend to inspect and scale ASG"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "autoscaling:DescribeAutoScalingGroups",
+          "autoscaling:DescribeAutoScalingInstances",
+          "autoscaling:SetDesiredCapacity",
+          "cloudwatch:GetMetricData",
+          "cloudwatch:ListMetrics",
+          "ec2:DescribeInstances"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "asg_attach" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = aws_iam_policy.asg_policy.arn
+}
+
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "CloudScale-EC2-Instance-Profile"
+  role = aws_iam_role.ec2_role.name
+}
+
+# ==============================================================================
+# 4. APPLICATION LOAD BALANCER & TARGET GROUPS
+# ==============================================================================
+
+# Target Group 1: Website 1 & Public API (Port 80)
+resource "aws_lb_target_group" "tg_80" {
+  name        = "tg-cloudscale-80"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "instance"
+
+  health_check {
+    enabled             = true
+    protocol            = "HTTP"
+    path                = "/api/health"
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 5
+    interval            = 15
+    matcher             = "200"
+  }
+
+  tags = {
+    Name = "tg-cloudscale-80"
+  }
+}
+
+# Target Group 2: Admin Dashboard & Telemetry Cockpit (Port 8080)
+resource "aws_lb_target_group" "tg_8080" {
+  name        = "tg-cloudscale-8080"
+  port        = 8080
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.main.id
+  target_type = "instance"
+
+  health_check {
+    enabled             = true
+    protocol            = "HTTP"
+    path                = "/api/health"
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+    timeout             = 5
+    interval            = 15
+    matcher             = "200"
+  }
+
+  tags = {
+    Name = "tg-cloudscale-8080"
+  }
+}
+
+# Application Load Balancer
+resource "aws_lb" "alb" {
+  name               = "cloudscale-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb_sg.id]
+  subnets            = [aws_subnet.pub_1.id, aws_subnet.pub_2.id]
+
+  enable_deletion_protection = false
+
+  tags = {
+    Name = "cloudscale-alb"
+  }
+}
+
+# ALB Listener 1 (Port 80) -> tg-cloudscale-80
+resource "aws_lb_listener" "listener_80" {
+  load_balancer_arn = aws_lb.alb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.tg_80.arn
+  }
+}
+
+# ALB Listener 2 (Port 8080) -> tg-cloudscale-8080
+resource "aws_lb_listener" "listener_8080" {
+  load_balancer_arn = aws_lb.alb.arn
+  port              = 8080
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.tg_8080.arn
+  }
+}
+
+# ==============================================================================
+# 5. AMI DISCOVERY (Golden AMI or Amazon Linux 2023 Fallback)
+# ==============================================================================
+
+# Search for the user's custom Golden AMI if no ID is specified
+data "aws_ami" "custom_golden" {
+  count       = var.ami_id == "" ? 1 : 0
+  most_recent = true
+  owners      = ["self"]
+
+  filter {
+    name   = "name"
+    values = ["CloudScale-Golden-AMI-*"]
+  }
+}
+
+# Fallback to standard Amazon Linux 2023 if self Golden AMI not yet built
+data "aws_ami" "al2023_fallback" {
+  count       = var.ami_id == "" ? 1 : 0
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-2023*-kernel-6.1-x86_64"]
+  }
+}
+
+locals {
+  # Priority: 1. Explicit var.ami_id -> 2. Self Golden AMI -> 3. Amazon Linux 2023
+  resolved_ami_id = var.ami_id != "" ? var.ami_id : (
+    length(try(data.aws_ami.custom_golden[0].id, "")) > 0 ?
+    data.aws_ami.custom_golden[0].id :
+    data.aws_ami.al2023_fallback[0].id
+  )
+}
+
+# ==============================================================================
+# 6. EC2 LAUNCH TEMPLATE
+# ==============================================================================
+
+resource "aws_launch_template" "lt" {
+  name_prefix   = "cloudscale-lt-"
+  image_id      = local.resolved_ami_id
+  instance_type = var.instance_type
+  key_name      = var.key_name != "" ? var.key_name : null
+
+  vpc_security_group_ids = [aws_security_group.ec2_sg.id]
+
+  iam_instance_profile {
+    name = aws_iam_instance_profile.ec2_profile.name
+  }
+
+  monitoring {
+    enabled = true
+  }
+
+  # Cloud-Init User Data ensures Docker and containers auto-boot
+  user_data = base64encode(<<-EOF
+    #!/bin/bash
+    systemctl start docker
+    docker start cloudscale || docker run -d --name cloudscale --restart unless-stopped -p 80:80 -p 8080:8080 cloudscale-app:latest
+  EOF
+  )
+
+  tag_specifications {
+    resource_type = "instance"
+    tags = {
+      Name = "CloudScale-Cluster-Node"
+    }
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# ==============================================================================
+# 7. AUTO SCALING GROUP & TARGET TRACKING SCALING POLICY
+# ==============================================================================
+
+resource "aws_autoscaling_group" "asg" {
+  name_prefix         = "cloudscale-asg-"
+  vpc_zone_identifier = [aws_subnet.pub_1.id, aws_subnet.pub_2.id]
+  target_group_arns   = [aws_lb_target_group.tg_80.arn, aws_lb_target_group.tg_8080.arn]
+
+  min_size         = var.min_capacity
+  desired_capacity = var.desired_capacity
+  max_size         = var.max_capacity
+
+  health_check_type         = "ELB"
+  health_check_grace_period = 180
+
+  launch_template {
+    id      = aws_launch_template.lt.id
+    version = "$Latest"
+  }
+
+  tag {
+    key                 = "Name"
+    value               = "CloudScale-Cluster-Node"
+    propagate_at_launch = true
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# Target Tracking Scaling Policy (Average CPU > 70%)
+resource "aws_autoscaling_policy" "cpu_target_tracking" {
+  name                   = "cloudscale-cpu-target-tracking"
+  autoscaling_group_name = aws_autoscaling_group.asg.name
+  policy_type            = "TargetTrackingScaling"
+
+  target_tracking_configuration {
+    predefined_metric_specification {
+      predefined_metric_type = "ASGAverageCPUUtilization"
+    }
+    target_value     = var.cpu_target_threshold
+    estimated_instance_warmup = 180
+  }
+}

@@ -44,7 +44,7 @@ export const loginAdmin = async (req, res) => {
     const sessionData = {
       username: ADMIN_USERNAME,
       role: 'AWS Infrastructure Administrator',
-      accessLevel: 'Full Control (ASG, ALB, EFS, CloudWatch)',
+      accessLevel: 'Full Control (ASG, ALB, EC2, CloudWatch)',
       region: process.env.AWS_REGION || 'ap-south-1',
       loginTime: new Date().toISOString(),
       expiresAt
