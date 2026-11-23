@@ -5,21 +5,21 @@ import { config } from '../config/index.js';
 const mockClusterNodes = [
   {
     instanceId: 'i-0123456789',
-    hostname: 'ip-10-0-1-25',
+    hostname: 'ip-192-168-0-135',
     availabilityZone: 'ap-south-1a',
-    privateIp: '10.0.1.25'
+    privateIp: '192.168.0.135'
   },
   {
     instanceId: 'i-0987654321',
-    hostname: 'ip-10-0-2-15',
+    hostname: 'ip-192-168-0-205',
     availabilityZone: 'ap-south-1b',
-    privateIp: '10.0.2.15'
+    privateIp: '192.168.0.205'
   },
   {
     instanceId: 'i-0456789123',
-    hostname: 'ip-10-0-1-48',
+    hostname: 'ip-192-168-0-148',
     availabilityZone: 'ap-south-1a',
-    privateIp: '10.0.1.48'
+    privateIp: '192.168.0.148'
   }
 ];
 
@@ -32,7 +32,7 @@ export async function getServerInfo(req) {
       instanceId: process.env.INSTANCE_ID || config.instanceId,
       hostname: os.hostname() || config.hostname,
       availabilityZone: process.env.AWS_AZ || config.defaultAz,
-      privateIp: process.env.PRIVATE_IP || '10.0.1.25'
+      privateIp: process.env.PRIVATE_IP || '192.168.0.135'
     };
   }
 

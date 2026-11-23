@@ -3,15 +3,17 @@
 Automated provisioning for the **CloudScale Multi-AZ High-Availability Auto-Scaling Cluster** on AWS.
 
 ## What This Code Creates
-1. **Custom VPC (`10.0.0.0/16`)** with Internet Gateway.
-2. **2 Multi-AZ Public Subnets** (`ap-south-1a` & `ap-south-1b`).
-3. **Chained Security Groups** (`ALB SG` -> `EC2 SG`).
-4. **IAM Instance Profile** (`CloudWatchReadOnlyAccess` + ASG telemetry permissions).
-5. **Application Load Balancer** with dual listeners:
+1. **Custom VPC (`192.168.0.0/24`)** with Internet Gateway.
+2. **2 Multi-AZ Public Subnets** (`192.168.0.0/26` in `ap-south-1a` & `192.168.0.64/26` in `ap-south-1b`) hosting the ALB and NAT Gateway.
+3. **2 Multi-AZ Private Subnets** (`192.168.0.128/26` in `ap-south-1a` & `192.168.0.192/26` in `ap-south-1b`) hosting isolated EC2 Auto Scaling instances.
+4. **NAT Gateway & Elastic IP** providing secure outbound connectivity for private EC2 instances.
+5. **Chained Security Groups** (`ALB SG` -> `EC2 SG`).
+6. **IAM Instance Profile** (`CloudWatchReadOnlyAccess` + ASG telemetry permissions).
+7. **Application Load Balancer** with dual listeners:
    - Port `80` -> Forward to `tg-cloudscale-80`
    - Port `8080` -> Forward to `tg-cloudscale-8080`
-6. **EC2 Launch Template** with Golden AMI & container auto-boot User Data.
-7. **Auto Scaling Group** with Target Tracking Policy (Average CPU > 70%).
+8. **EC2 Launch Template** with Golden AMI & container auto-boot User Data.
+9. **Auto Scaling Group** in Private Subnets with Target Tracking Policy (Average CPU > 70%).
 
 ## Quick Start
 

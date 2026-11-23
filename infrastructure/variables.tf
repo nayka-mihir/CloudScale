@@ -7,19 +7,31 @@ variable "aws_region" {
 variable "vpc_cidr" {
   description = "CIDR block for the custom VPC"
   type        = string
-  default     = "10.0.0.0/16"
+  default     = "192.168.0.0/24"
 }
 
 variable "subnet_1_cidr" {
   description = "CIDR block for Public Subnet 1 in AZ-a"
   type        = string
-  default     = "10.0.1.0/24"
+  default     = "192.168.0.0/26"
 }
 
 variable "subnet_2_cidr" {
   description = "CIDR block for Public Subnet 2 in AZ-b"
   type        = string
-  default     = "10.0.2.0/24"
+  default     = "192.168.0.64/26"
+}
+
+variable "subnet_priv_1_cidr" {
+  description = "CIDR block for Private Subnet 1 in AZ-a"
+  type        = string
+  default     = "192.168.0.128/26"
+}
+
+variable "subnet_priv_2_cidr" {
+  description = "CIDR block for Private Subnet 2 in AZ-b"
+  type        = string
+  default     = "192.168.0.192/26"
 }
 
 variable "az_1" {

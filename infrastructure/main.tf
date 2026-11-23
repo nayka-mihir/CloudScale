@@ -24,7 +24,7 @@ provider "aws" {
 # 1. NETWORKING (VPC, Subnets, Internet Gateway & Routing)
 # ==============================================================================
 
-# Custom VPC (10.0.0.0/16)
+# Custom VPC (192.168.0.0/24)
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
@@ -82,7 +82,7 @@ resource "aws_route_table" "public" {
   }
 }
 
-# Route Table Associations
+# Route Table Associations (Public Subnets to IGW)
 resource "aws_route_table_association" "pub_1" {
   subnet_id      = aws_subnet.pub_1.id
   route_table_id = aws_route_table.public.id
@@ -91,6 +91,80 @@ resource "aws_route_table_association" "pub_1" {
 resource "aws_route_table_association" "pub_2" {
   subnet_id      = aws_subnet.pub_2.id
   route_table_id = aws_route_table.public.id
+}
+
+# ------------------------------------------------------------------------------
+# Private Subnets & NAT Gateway (Enterprise Defense-in-Depth for EC2 Nodes)
+# ------------------------------------------------------------------------------
+
+# Private Subnet 1 (ap-south-1a)
+resource "aws_subnet" "priv_1" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = var.subnet_priv_1_cidr
+  availability_zone       = var.az_1
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name = "cloudscale-priv-sub-1"
+  }
+}
+
+# Private Subnet 2 (ap-south-1b)
+resource "aws_subnet" "priv_2" {
+  vpc_id                  = aws_vpc.main.id
+  cidr_block              = var.subnet_priv_2_cidr
+  availability_zone       = var.az_2
+  map_public_ip_on_launch = false
+
+  tags = {
+    Name = "cloudscale-priv-sub-2"
+  }
+}
+
+# Elastic IP for NAT Gateway
+resource "aws_eip" "nat_eip" {
+  domain = "vpc"
+
+  tags = {
+    Name = "cloudscale-nat-eip"
+  }
+}
+
+# NAT Gateway (Resides in Public Subnet 1 to route private subnet outbound traffic)
+resource "aws_nat_gateway" "nat_gw" {
+  allocation_id = aws_eip.nat_eip.id
+  subnet_id     = aws_subnet.pub_1.id
+
+  tags = {
+    Name = "cloudscale-nat-gw"
+  }
+
+  depends_on = [aws_internet_gateway.igw]
+}
+
+# Private Route Table (Routes outbound internet via NAT Gateway)
+resource "aws_route_table" "private" {
+  vpc_id = aws_vpc.main.id
+
+  route {
+    cidr_block     = "0.0.0.0/0"
+    nat_gateway_id = aws_nat_gateway.nat_gw.id
+  }
+
+  tags = {
+    Name = "cloudscale-priv-rt"
+  }
+}
+
+# Route Table Associations (Private Subnets to NAT Gateway)
+resource "aws_route_table_association" "priv_1" {
+  subnet_id      = aws_subnet.priv_1.id
+  route_table_id = aws_route_table.private.id
+}
+
+resource "aws_route_table_association" "priv_2" {
+  subnet_id      = aws_subnet.priv_2.id
+  route_table_id = aws_route_table.private.id
 }
 
 # ==============================================================================
@@ -421,7 +495,7 @@ resource "aws_launch_template" "lt" {
 
 resource "aws_autoscaling_group" "asg" {
   name_prefix         = "cloudscale-asg-"
-  vpc_zone_identifier = [aws_subnet.pub_1.id, aws_subnet.pub_2.id]
+  vpc_zone_identifier = [aws_subnet.priv_1.id, aws_subnet.priv_2.id]
   target_group_arns   = [aws_lb_target_group.tg_80.arn, aws_lb_target_group.tg_8080.arn]
 
   min_size         = var.min_capacity
@@ -441,6 +515,8 @@ resource "aws_autoscaling_group" "asg" {
     value               = "CloudScale-Cluster-Node"
     propagate_at_launch = true
   }
+
+  depends_on = [aws_nat_gateway.nat_gw]
 
   lifecycle {
     create_before_destroy = true

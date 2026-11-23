@@ -10,7 +10,7 @@ const clusterState = {
   instances: [
     {
       id: 'i-0123456789',
-      hostname: 'ip-10-0-1-25',
+      hostname: 'ip-192-168-0-135',
       az: 'ap-south-1a',
       state: 'running',
       health: 'healthy',
@@ -19,7 +19,7 @@ const clusterState = {
     },
     {
       id: 'i-0987654321',
-      hostname: 'ip-10-0-2-15',
+      hostname: 'ip-192-168-0-205',
       az: 'ap-south-1b',
       state: 'running',
       health: 'healthy',
@@ -28,7 +28,7 @@ const clusterState = {
     },
     {
       id: 'i-0456789123',
-      hostname: 'ip-10-0-1-48',
+      hostname: 'ip-192-168-0-148',
       az: 'ap-south-1a',
       state: 'running',
       health: 'healthy',
@@ -66,7 +66,7 @@ setInterval(() => {
       const hex = Math.random().toString(16).substring(2, 12);
       const newInst = {
         id: `i-${hex}`,
-        hostname: `ip-10-0-1-${octet}`,
+        hostname: `ip-192-168-0-${octet}`,
         az: nextAz,
         state: 'running',
         health: 'healthy',
@@ -132,7 +132,7 @@ export function adjustCapacity(action, value) {
       const octet = Math.floor(10 + Math.random() * 80);
       clusterState.instances.push({
         id: `i-${hex}`,
-        hostname: `ip-10-0-1-${octet}`,
+        hostname: `ip-192-168-0-${octet}`,
         az,
         state: 'running',
         health: 'healthy',

@@ -9,5 +9,5 @@ export const config = {
   defaultRegion: process.env.AWS_REGION || 'ap-south-1',
   defaultAz: process.env.AWS_AZ || 'ap-south-1a',
   instanceId: process.env.INSTANCE_ID || 'i-0123456789',
-  hostname: process.env.HOSTNAME || 'ip-10-0-1-25'
+  hostname: process.env.HOSTNAME || 'ip-192-168-0-135'
 };

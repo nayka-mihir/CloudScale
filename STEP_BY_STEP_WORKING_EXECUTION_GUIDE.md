@@ -232,7 +232,7 @@ We need an isolated Virtual Private Cloud across two Availability Zones (`ap-sou
 - **Settings**:
   - Select: **VPC only**
   - **Name tag**: `cloudscale-vpc`
-  - **IPv4 CIDR block**: `10.0.0.0/16`
+  - **IPv4 CIDR block**: `192.168.0.0/24`
   - Click **Create VPC**.
 - **Enable DNS**:
   - Select your newly created `cloudscale-vpc`.
@@ -257,12 +257,12 @@ We need an isolated Virtual Private Cloud across two Availability Zones (`ap-sou
   - **Subnet 1**:
     - **Subnet name**: `cloudscale-pub-sub-1`
     - **Availability Zone**: Select `ap-south-1a` (or your region's first zone `us-east-1a`)
-    - **IPv4 CIDR block**: `10.0.1.0/24`
+    - **IPv4 CIDR block**: `192.168.0.0/26`
   - Click **Add new subnet** (scroll down).
   - **Subnet 2**:
     - **Subnet name**: `cloudscale-pub-sub-2`
     - **Availability Zone**: Select `ap-south-1b` (or your region's second zone `us-east-1b`)
-    - **IPv4 CIDR block**: `10.0.2.0/24`
+    - **IPv4 CIDR block**: `192.168.0.64/26`
   - Click **Create subnet**.
 
 - **Enable Auto-Assign Public IP**:
@@ -296,12 +296,12 @@ We need an isolated Virtual Private Cloud across two Availability Zones (`ap-sou
   - **Private Subnet 1**:
     - **Subnet name**: `cloudscale-priv-sub-1`
     - **Availability Zone**: Select `ap-south-1a` (same AZ as Public Subnet 1)
-    - **IPv4 CIDR block**: `10.0.3.0/24`
+    - **IPv4 CIDR block**: `192.168.0.128/26`
   - Click **Add new subnet** (scroll down).
   - **Private Subnet 2**:
     - **Subnet name**: `cloudscale-priv-sub-2`
     - **Availability Zone**: Select `ap-south-1b` (same AZ as Public Subnet 2)
-    - **IPv4 CIDR block**: `10.0.4.0/24`
+    - **IPv4 CIDR block**: `192.168.0.192/26`
   - Click **Create subnet**.
 - **Note**: Do **NOT** enable auto-assign public IP on private subnets.
 
@@ -349,8 +349,8 @@ We need an isolated Virtual Private Cloud across two Availability Zones (`ap-sou
    - Click **Save associations**.
 
 - **Expected Result**: 
-  - Public Subnets (`10.0.1.0/24`, `10.0.2.0/24`) route through `cloudscale-igw` (ALB / Public facing).
-  - Private Subnets (`10.0.3.0/24`, `10.0.4.0/24`) route through `cloudscale-nat-gw` (Secure EC2 instances).
+  - Public Subnets (`192.168.0.0/26`, `192.168.0.64/26`) route through `cloudscale-igw` (ALB / Public facing).
+  - Private Subnets (`192.168.0.128/26`, `192.168.0.192/26`) route through `cloudscale-nat-gw` (Secure EC2 instances).
 
 
 ---
@@ -696,7 +696,7 @@ This defines the configuration template for new instances spawned by Auto Scalin
      - Click **Next**.
   2. **Step 2: Choose instance launch options**:
      - **VPC**: Select `cloudscale-vpc`.
-     - **Availability Zones and subnets**: Select both `cloudscale-pub-sub-1` and `cloudscale-pub-sub-2`.
+     - **Availability Zones and subnets**: Select both `cloudscale-priv-sub-1` and `cloudscale-priv-sub-2` *(Enterprise Standard: EC2 compute nodes run securely in Private Subnets with zero direct public IP exposure)*.
      - Click **Next**.
   3. **Step 3: Configure advanced options**:
      - **Load balancing**: Select **Attach to an existing load balancer**.

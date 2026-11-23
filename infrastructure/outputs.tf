@@ -32,3 +32,18 @@ output "resolved_ami_id" {
   description = "The AMI ID used to launch the cluster nodes"
   value       = local.resolved_ami_id
 }
+
+output "public_subnet_ids" {
+  description = "Public Subnet IDs hosting the ALB and NAT Gateway"
+  value       = [aws_subnet.pub_1.id, aws_subnet.pub_2.id]
+}
+
+output "private_subnet_ids" {
+  description = "Private Subnet IDs hosting the Auto Scaling EC2 instances"
+  value       = [aws_subnet.priv_1.id, aws_subnet.priv_2.id]
+}
+
+output "nat_gateway_public_ip" {
+  description = "Public Elastic IP assigned to NAT Gateway"
+  value       = aws_eip.nat_eip.public_ip
+}
