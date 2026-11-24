@@ -1,39 +1,30 @@
 // In-memory cluster state machine
 const clusterState = {
   minCapacity: 2,
-  desiredCapacity: 3,
+  desiredCapacity: 2,
   maxCapacity: 6,
   loadTestActive: false,
-  stressInterval: null,
-  currentCpu: 65,
-  currentRequests: 250,
+  stressTimeout: null,
+  currentCpu: 42,
+  currentRequests: 180,
   instances: [
     {
-      id: 'i-0123456789',
+      id: 'i-07fc1d8338766d3b5',
       hostname: 'ip-192-168-0-135',
       az: 'ap-southeast-2a',
       state: 'running',
       health: 'healthy',
-      cpu: 64,
+      cpu: 40,
       launchTime: new Date(Date.now() - 3600000 * 5).toISOString()
     },
     {
-      id: 'i-0987654321',
+      id: 'i-0ebf45aadfd8cc5b6',
       hostname: 'ip-192-168-0-205',
       az: 'ap-southeast-2b',
       state: 'running',
       health: 'healthy',
-      cpu: 66,
+      cpu: 44,
       launchTime: new Date(Date.now() - 3600000 * 4.2).toISOString()
-    },
-    {
-      id: 'i-0456789123',
-      hostname: 'ip-192-168-0-148',
-      az: 'ap-southeast-2a',
-      state: 'running',
-      health: 'healthy',
-      cpu: 65,
-      launchTime: new Date(Date.now() - 3600000 * 1.5).toISOString()
     }
   ],
   history: []
@@ -46,23 +37,28 @@ for (let i = 10; i >= 0; i--) {
   const timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   clusterState.history.push({
     timestamp: timeStr,
-    cpu: Math.floor(45 + Math.random() * 20),
-    requests: Math.floor(220 + Math.random() * 40),
-    healthyHosts: 3
+    cpu: Math.floor(35 + Math.random() * 10),
+    requests: Math.floor(160 + Math.random() * 40),
+    healthyHosts: 2
   });
 }
 
 // Background simulation ticker
 setInterval(() => {
   if (clusterState.loadTestActive) {
-    clusterState.currentCpu = Math.min(96, Math.floor(80 + Math.random() * 12));
-    clusterState.currentRequests = Math.floor(750 + Math.random() * 220);
+    // Dynamic load sharing: as new instances join, load distributes
+    // 2 instances: 22 + (115 / 2) = 79-82% -> Triggers scale out to 3
+    // 3 instances: 22 + (115 / 3) = 60-63% -> Absorbs load, drops below 70%!
+    const baseLoad = 22;
+    const dynamicLoad = Math.floor(115 / clusterState.instances.length);
+    clusterState.currentCpu = Math.min(95, baseLoad + dynamicLoad + Math.floor(Math.random() * 4));
+    clusterState.currentRequests = Math.floor(280 * clusterState.instances.length + Math.random() * 40);
 
-    // Auto-scaling trigger
+    // Auto-scaling trigger: ONLY scale if average CPU is still > 70%
     if (clusterState.currentCpu > 70 && clusterState.instances.length < clusterState.maxCapacity) {
       const azList = ['ap-southeast-2a', 'ap-southeast-2b'];
       const nextAz = azList[clusterState.instances.length % 2];
-      const octet = Math.floor(20 + Math.random() * 70);
+      const octet = Math.floor(130 + clusterState.instances.length * 18);
       const hex = Math.random().toString(16).substring(2, 12);
       const newInst = {
         id: `i-${hex}`,
@@ -70,20 +66,20 @@ setInterval(() => {
         az: nextAz,
         state: 'running',
         health: 'healthy',
-        cpu: Math.floor(clusterState.currentCpu * 0.9),
+        cpu: Math.floor(clusterState.currentCpu * 0.85),
         launchTime: new Date().toISOString()
       };
       clusterState.instances.push(newInst);
       clusterState.desiredCapacity = clusterState.instances.length;
     }
   } else {
-    // Steady state: maintain around 50-65%
-    const target = 55 + Math.floor(Math.random() * 10);
-    clusterState.currentCpu = Math.max(28, Math.floor(clusterState.currentCpu * 0.85 + target * 0.15));
-    clusterState.currentRequests = Math.max(200, Math.floor(clusterState.currentRequests * 0.9 + 250 * 0.1));
+    // Steady state: maintain around 35-45%
+    const target = 36 + Math.floor(Math.random() * 8);
+    clusterState.currentCpu = Math.max(25, Math.floor(clusterState.currentCpu * 0.8 + target * 0.2));
+    clusterState.currentRequests = Math.max(120, Math.floor(clusterState.currentRequests * 0.85 + 160 * 0.15));
 
-    // Auto-scale in
-    if (clusterState.currentCpu < 30 && clusterState.instances.length > clusterState.minCapacity) {
+    // Auto-scale in: gracefully return to minCapacity (2)
+    if (clusterState.currentCpu < 50 && clusterState.instances.length > clusterState.minCapacity) {
       clusterState.instances.pop();
       clusterState.desiredCapacity = clusterState.instances.length;
     }
@@ -163,17 +159,13 @@ export function startStressTest() {
 
   clusterState.loadTestActive = true;
   clusterState.currentCpu = 78;
-  clusterState.currentRequests = 740;
+  clusterState.currentRequests = 560;
 
-  const stressWorker = () => {
-    if (!clusterState.loadTestActive) return;
-    const start = Date.now();
-    while (Date.now() - start < 140) {
-      Math.sqrt(Math.random() * 1000000);
-    }
-    setTimeout(stressWorker, 60);
-  };
-  stressWorker();
+  // Safety auto-stop after 90 seconds so load tests don't run indefinitely
+  if (clusterState.stressTimeout) clearTimeout(clusterState.stressTimeout);
+  clusterState.stressTimeout = setTimeout(() => {
+    stopStressTest();
+  }, 90000);
 
   return {
     success: true,
@@ -183,6 +175,10 @@ export function startStressTest() {
 
 export function stopStressTest() {
   clusterState.loadTestActive = false;
+  if (clusterState.stressTimeout) {
+    clearTimeout(clusterState.stressTimeout);
+    clusterState.stressTimeout = null;
+  }
   return {
     success: true,
     message: 'Load test stopped. Cluster entering stabilization cooldown window.'

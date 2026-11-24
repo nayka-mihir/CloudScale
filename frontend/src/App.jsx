@@ -38,19 +38,18 @@ export default function App() {
         if (prev) return prev;
         return {
           summary: {
-            totalInstances: 3,
-            healthyInstances: 3,
-            avgCpuPercent: 65,
-            requestsPerMinute: 250,
-            desiredCapacity: 3,
+            totalInstances: 2,
+            healthyInstances: 2,
+            avgCpuPercent: 42,
+            requestsPerMinute: 180,
+            desiredCapacity: 2,
             minCapacity: 2,
             maxCapacity: 6,
             loadTestActive: false
           },
           instances: [
-            { id: 'i-0123456789', az: 'ap-southeast-2a', state: 'running', health: 'healthy', cpu: 64, launchTime: new Date().toISOString() },
-            { id: 'i-0987654321', az: 'ap-southeast-2b', state: 'running', health: 'healthy', cpu: 66, launchTime: new Date().toISOString() },
-            { id: 'i-0456789123', az: 'ap-southeast-2a', state: 'running', health: 'healthy', cpu: 65, launchTime: new Date().toISOString() }
+            { id: 'i-07fc1d8338766d3b5', az: 'ap-southeast-2a', state: 'running', health: 'healthy', cpu: 40, launchTime: new Date().toISOString() },
+            { id: 'i-0ebf45aadfd8cc5b6', az: 'ap-southeast-2b', state: 'running', health: 'healthy', cpu: 44, launchTime: new Date().toISOString() }
           ],
           history: []
         };

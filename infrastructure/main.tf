@@ -374,7 +374,6 @@ resource "aws_lb_target_group" "tg_8080" {
     matcher             = "200"
   }
 
-  # Enable Session Stickiness so Dashboard state remains persistent on one node
   stickiness {
     type            = "lb_cookie"
     cookie_duration = 3600

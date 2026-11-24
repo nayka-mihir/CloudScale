@@ -36,20 +36,19 @@ export default function AdminDashboard({ metrics, refreshMetrics, triggerNotific
   const [actionLoading, setActionLoading] = useState(false);
 
   const summary = metrics?.summary || {
-    totalInstances: 3,
-    healthyInstances: 3,
-    avgCpuPercent: 65,
-    requestsPerMinute: 250,
-    desiredCapacity: 3,
+    totalInstances: 2,
+    healthyInstances: 2,
+    avgCpuPercent: 42,
+    requestsPerMinute: 180,
+    desiredCapacity: 2,
     minCapacity: 2,
     maxCapacity: 6,
     loadTestActive: false
   };
 
   const instances = metrics?.instances || [
-    { id: 'i-0a81b2c3d4e5f001', az: 'us-east-1a', state: 'running', health: 'healthy', cpu: 64, launchTime: new Date().toISOString() },
-    { id: 'i-0b92c3d4e5f6a002', az: 'us-east-1b', state: 'running', health: 'healthy', cpu: 66, launchTime: new Date().toISOString() },
-    { id: 'i-0c73d4e5f6a7b003', az: 'us-east-1a', state: 'running', health: 'healthy', cpu: 65, launchTime: new Date().toISOString() }
+    { id: 'i-07fc1d8338766d3b5', az: 'ap-southeast-2a', state: 'running', health: 'healthy', cpu: 40, launchTime: new Date().toISOString() },
+    { id: 'i-0ebf45aadfd8cc5b6', az: 'ap-southeast-2b', state: 'running', health: 'healthy', cpu: 44, launchTime: new Date().toISOString() }
   ];
 
   const history = metrics?.history || [];
