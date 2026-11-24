@@ -350,6 +350,13 @@ resource "aws_lb_target_group" "tg_80" {
     matcher             = "200"
   }
 
+  # Enable Session Stickiness on Port 80 for consistent browser sessions
+  stickiness {
+    type            = "lb_cookie"
+    cookie_duration = 3600
+    enabled         = true
+  }
+
   tags = {
     Name = "tg-cloudscale-80"
   }
