@@ -11,7 +11,7 @@ const clusterState = {
     {
       id: 'i-0123456789',
       hostname: 'ip-192-168-0-135',
-      az: 'ap-south-1a',
+      az: 'ap-southeast-2a',
       state: 'running',
       health: 'healthy',
       cpu: 64,
@@ -20,7 +20,7 @@ const clusterState = {
     {
       id: 'i-0987654321',
       hostname: 'ip-192-168-0-205',
-      az: 'ap-south-1b',
+      az: 'ap-southeast-2b',
       state: 'running',
       health: 'healthy',
       cpu: 66,
@@ -29,7 +29,7 @@ const clusterState = {
     {
       id: 'i-0456789123',
       hostname: 'ip-192-168-0-148',
-      az: 'ap-south-1a',
+      az: 'ap-southeast-2a',
       state: 'running',
       health: 'healthy',
       cpu: 65,
@@ -60,7 +60,7 @@ setInterval(() => {
 
     // Auto-scaling trigger
     if (clusterState.currentCpu > 70 && clusterState.instances.length < clusterState.maxCapacity) {
-      const azList = ['ap-south-1a', 'ap-south-1b'];
+      const azList = ['ap-southeast-2a', 'ap-southeast-2b'];
       const nextAz = azList[clusterState.instances.length % 2];
       const octet = Math.floor(20 + Math.random() * 70);
       const hex = Math.random().toString(16).substring(2, 12);
@@ -127,7 +127,7 @@ export function adjustCapacity(action, value) {
   if (action === 'increase') {
     if (clusterState.desiredCapacity < clusterState.maxCapacity) {
       clusterState.desiredCapacity += 1;
-      const az = clusterState.instances.length % 2 === 0 ? 'ap-south-1a' : 'ap-south-1b';
+      const az = clusterState.instances.length % 2 === 0 ? 'ap-southeast-2a' : 'ap-southeast-2b';
       const hex = Math.random().toString(16).substring(2, 12);
       const octet = Math.floor(10 + Math.random() * 80);
       clusterState.instances.push({

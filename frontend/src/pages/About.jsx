@@ -55,7 +55,7 @@ export default function About({ onNavigate, theme }) {
         </p>
 
         <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-slate-800">
-          <span className="text-xs text-slate-400 font-mono">AWS Region: ap-south-1 (Mumbai)</span>
+          <span className="text-xs text-slate-400 font-mono">AWS Region: ap-southeast-2 (Sydney)</span>
           <button
             onClick={() => onNavigate('features')}
             className="text-xs text-red-600 hover:text-red-700 dark:text-cyan-400 dark:hover:text-cyan-300 flex items-center gap-1 font-bold cursor-pointer"

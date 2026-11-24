@@ -21,8 +21,8 @@ export default function Home({ onNavigate, clusterSummary, theme }) {
     } catch (err) {
       setServerInfo({
         instanceId: 'i-0123456789',
-        hostname: 'ip-10-0-1-25',
-        availabilityZone: 'ap-south-1a'
+        hostname: 'ip-192-168-0-135',
+        availabilityZone: 'ap-southeast-2a'
       });
     } finally {
       setLoadingServerInfo(false);
@@ -119,11 +119,11 @@ export default function Home({ onNavigate, clusterSummary, theme }) {
             </div>
             <div className="bg-[#f8fafc] dark:bg-slate-950/80 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
               <span className="text-slate-500 block text-[10px] uppercase font-sans tracking-wider mb-1 font-semibold">HOSTNAME / IP</span>
-              <span className="text-slate-800 dark:text-slate-200 font-bold text-sm sm:text-base">{serverInfo?.hostname || 'ip-10-0-1-25'}</span>
+              <span className="text-slate-800 dark:text-slate-200 font-bold text-sm sm:text-base">{serverInfo?.hostname || 'ip-192-168-0-135'}</span>
             </div>
             <div className="bg-[#f8fafc] dark:bg-slate-950/80 p-3.5 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
               <span className="text-slate-500 block text-[10px] uppercase font-sans tracking-wider mb-1 font-semibold">AVAILABILITY ZONE</span>
-              <span className="text-slate-800 dark:text-indigo-400 font-bold text-sm sm:text-base">{serverInfo?.availabilityZone || 'ap-south-1a'}</span>
+              <span className="text-slate-800 dark:text-indigo-400 font-bold text-sm sm:text-base">{serverInfo?.availabilityZone || 'ap-southeast-2a'}</span>
             </div>
           </div>
         </div>

@@ -189,6 +189,38 @@ This allows the backend running on EC2 to query CloudWatch metrics and trigger A
     			"elasticloadbalancing:DescribeTargetHealth"
     		],
     		"Resource": "*"
+    	},
+    	{
+    		"Sid": "AmazonSSMManagedInstanceCoreAccess",
+    		"Effect": "Allow",
+    		"Action": [
+    			"ssm:DescribeAssociation",
+    			"ssm:GetDeployablePatchSnapshotForInstance",
+    			"ssm:GetDocument",
+    			"ssm:DescribeDocument",
+    			"ssm:GetManifest",
+    			"ssm:GetParameter",
+    			"ssm:GetParameters",
+    			"ssm:ListAssociations",
+    			"ssm:ListInstanceAssociations",
+    			"ssm:PutInventory",
+    			"ssm:PutComplianceItems",
+    			"ssm:PutConfigurePackageResult",
+    			"ssm:UpdateAssociationStatus",
+    			"ssm:UpdateInstanceAssociationStatus",
+    			"ssm:UpdateInstanceInformation",
+    			"ssmmessages:CreateControlChannel",
+    			"ssmmessages:CreateDataChannel",
+    			"ssmmessages:OpenControlChannel",
+    			"ssmmessages:OpenDataChannel",
+    			"ec2messages:AcknowledgeMessage",
+    			"ec2messages:DeleteMessage",
+    			"ec2messages:FailMessage",
+    			"ec2messages:GetEndpoint",
+    			"ec2messages:GetMessages",
+    			"ec2messages:SendReply"
+    		],
+    		"Resource": "*"
     	}
 	]
 }
@@ -196,10 +228,13 @@ This allows the backend running on EC2 to query CloudWatch metrics and trigger A
 6. Click **Next**. Name the policy: `CloudScale-Backend-Policy`.
 7. Click **Create policy**. Close this browser tab.
 8. Go back to the **Create role** tab. Click the **Refresh** button next to Filter policies.
-9. Search for `CloudScale-Backend-Policy` and check the checkbox. Click **Next**.
+9. Attach permissions to the role:
+   - Search for `CloudScale-Backend-Policy` and check the checkbox.
+   - Search for the AWS Managed Policy **`AmazonSSMManagedInstanceCore`** and check the checkbox *(enables secure AWS Systems Manager Session Manager access without open Port 22 SSH)*.
+   - Click **Next**.
 10. **Role name**: `CloudScale-EC2-Instance-Role`
 11. Click **Create role**.
-- **Expected Result**: Role `CloudScale-EC2-Instance-Role` appears in IAM with `CloudScale-Backend-Policy` attached.
+- **Expected Result**: Role `CloudScale-EC2-Instance-Role` appears in IAM with `CloudScale-Backend-Policy` and `AmazonSSMManagedInstanceCore` attached.
 
 ---
 
@@ -225,7 +260,7 @@ This allows the backend running on EC2 to query CloudWatch metrics and trigger A
 <a name="step-1-create-vpc--multi-az-networking"></a>
 ## 🌐 STEP 1: Create VPC & Multi-AZ Networking
 
-We need an isolated Virtual Private Cloud across two Availability Zones (`ap-south-1a` and `ap-south-1b`).
+We need an isolated Virtual Private Cloud across two Availability Zones (`ap-southeast-2a` and `ap-southeast-2b`).
 
 ### 1.1: Create VPC
 - **Where**: AWS Console ➔ Search **VPC** ➔ Click **Your VPCs** ➔ Click **Create VPC**.
@@ -256,12 +291,12 @@ We need an isolated Virtual Private Cloud across two Availability Zones (`ap-sou
   - **VPC ID**: Select `cloudscale-vpc`.
   - **Subnet 1**:
     - **Subnet name**: `cloudscale-pub-sub-1`
-    - **Availability Zone**: Select `ap-south-1a` (or your region's first zone `us-east-1a`)
+    - **Availability Zone**: Select `ap-southeast-2a`
     - **IPv4 CIDR block**: `192.168.0.0/26`
   - Click **Add new subnet** (scroll down).
   - **Subnet 2**:
     - **Subnet name**: `cloudscale-pub-sub-2`
-    - **Availability Zone**: Select `ap-south-1b` (or your region's second zone `us-east-1b`)
+    - **Availability Zone**: Select `ap-southeast-2b`
     - **IPv4 CIDR block**: `192.168.0.64/26`
   - Click **Create subnet**.
 
@@ -295,12 +330,12 @@ We need an isolated Virtual Private Cloud across two Availability Zones (`ap-sou
   - **VPC ID**: Select `cloudscale-vpc`.
   - **Private Subnet 1**:
     - **Subnet name**: `cloudscale-priv-sub-1`
-    - **Availability Zone**: Select `ap-south-1a` (same AZ as Public Subnet 1)
+    - **Availability Zone**: Select `ap-southeast-2a` (same AZ as Public Subnet 1)
     - **IPv4 CIDR block**: `192.168.0.128/26`
   - Click **Add new subnet** (scroll down).
   - **Private Subnet 2**:
     - **Subnet name**: `cloudscale-priv-sub-2`
-    - **Availability Zone**: Select `ap-south-1b` (same AZ as Public Subnet 2)
+    - **Availability Zone**: Select `ap-southeast-2b` (same AZ as Public Subnet 2)
     - **IPv4 CIDR block**: `192.168.0.192/26`
   - Click **Create subnet**.
 - **Note**: Do **NOT** enable auto-assign public IP on private subnets.
@@ -480,7 +515,7 @@ cd CloudScale
 cat <<EOF > /home/ec2-user/CloudScale/backend/.env
 PORT=5000
 NODE_ENV=production
-AWS_REGION=ap-south-1
+AWS_REGION=ap-southeast-2
 AWS_ASG_NAME=cloudscale-asg
 SIMULATE_AWS=false
 EOF
@@ -639,8 +674,8 @@ We need two Target Groups: one for Website 1 (Port 80) and one for Website 2 (Po
   4. **Network mapping**:
      - **VPC**: Select `cloudscale-vpc`.
      - **Mappings**:
-       - Zone 1 (`ap-south-1a`): Select `cloudscale-pub-sub-1`.
-       - Zone 2 (`ap-south-1b`): Select `cloudscale-pub-sub-2`.
+       - Zone 1 (`ap-southeast-2a`): Select `cloudscale-pub-sub-1`.
+       - Zone 2 (`ap-southeast-2b`): Select `cloudscale-pub-sub-2`.
   5. **Security groups**:
      - Remove default.
      - Select **`cloudscale-alb-sg`**.
@@ -650,7 +685,7 @@ We need two Target Groups: one for Website 1 (Port 80) and one for Website 2 (Po
      - **Listener 2**: Protocol `HTTP` | Port `8080` ➔ Forward to: `tg-cloudscale-8080`.
   7. Click **Create load balancer**.
   8. Wait 2 minutes until State turns green **`Active`**.
-  9. **Copy your ALB DNS name**: (e.g., `cloudscale-alb-123456789.ap-south-1.elb.amazonaws.com`).
+  9. **Copy your ALB DNS name**: (e.g., `cloudscale-alb-123456789.ap-southeast-2.elb.amazonaws.com`).
 
 ---
 
@@ -729,8 +764,8 @@ Wait 2 to 3 minutes for AWS to launch the cluster nodes:
 
 1. Go to **EC2** ➔ **Instances**:
    - You should see **2 running instances** named `CloudScale-Cluster-Node`:
-     - One in `ap-south-1a`
-     - One in `ap-south-1b`
+     - One in `ap-southeast-2a`
+     - One in `ap-southeast-2b`
 2. Go to **EC2** ➔ **Target Groups** ➔ Click `tg-cloudscale-80` ➔ **Targets tab**:
    - Both instances must display status **`Healthy`** with green checkmarks!
 3. Click `tg-cloudscale-8080` ➔ **Targets tab**:
@@ -841,7 +876,7 @@ When presenting to your evaluator or professor, deliver this exact narrative:
    > *"Good morning Professor. This project is **CloudScale**, an enterprise-grade multi-AZ auto-scaling architecture on AWS. We have deployed two isolated applications: Website 1 on Port 80 for public visitors, and Website 2 on Port 8080 as our DevOps infrastructure control plane."*
 
 2. **Demonstrate High Availability (1 minute)**:
-   > *"Notice in the AWS Console that our baseline fleet is distributed evenly across two distinct Availability Zones (`ap-south-1a` and `ap-south-1b`). If an entire AWS data center loses power, our Application Load Balancer immediately routes 100% of user traffic to the surviving zone without dropping a single packet."*
+   > *"Notice in the AWS Console that our baseline fleet is distributed evenly across two distinct Availability Zones (`ap-southeast-2a` and `ap-southeast-2b`). If an entire AWS data center loses power, our Application Load Balancer immediately routes 100% of user traffic to the surviving zone without dropping a single packet."*
 
 3. **Demonstrate Dynamic Elasticity (2 minutes)**:
    > *"Now I will trigger our in-process synthetic stress test on the Admin Dashboard. Watch our radial CPU gauge climb above 85%. CloudWatch evaluates this metric every minute. As our Average CPU exceeds 70%, CloudWatch sounds the alarm, and the Auto Scaling Group automatically provisions new EC2 instances from our pre-baked Golden AMI in under 45 seconds."*

@@ -48,9 +48,9 @@ export default function App() {
             loadTestActive: false
           },
           instances: [
-            { id: 'i-0123456789', az: 'ap-south-1a', state: 'running', health: 'healthy', cpu: 64, launchTime: new Date().toISOString() },
-            { id: 'i-0987654321', az: 'ap-south-1b', state: 'running', health: 'healthy', cpu: 66, launchTime: new Date().toISOString() },
-            { id: 'i-0456789123', az: 'ap-south-1a', state: 'running', health: 'healthy', cpu: 65, launchTime: new Date().toISOString() }
+            { id: 'i-0123456789', az: 'ap-southeast-2a', state: 'running', health: 'healthy', cpu: 64, launchTime: new Date().toISOString() },
+            { id: 'i-0987654321', az: 'ap-southeast-2b', state: 'running', health: 'healthy', cpu: 66, launchTime: new Date().toISOString() },
+            { id: 'i-0456789123', az: 'ap-southeast-2a', state: 'running', health: 'healthy', cpu: 65, launchTime: new Date().toISOString() }
           ],
           history: []
         };

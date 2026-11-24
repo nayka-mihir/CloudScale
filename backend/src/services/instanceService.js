@@ -6,19 +6,19 @@ const mockClusterNodes = [
   {
     instanceId: 'i-0123456789',
     hostname: 'ip-192-168-0-135',
-    availabilityZone: 'ap-south-1a',
+    availabilityZone: 'ap-southeast-2a',
     privateIp: '192.168.0.135'
   },
   {
     instanceId: 'i-0987654321',
     hostname: 'ip-192-168-0-205',
-    availabilityZone: 'ap-south-1b',
+    availabilityZone: 'ap-southeast-2b',
     privateIp: '192.168.0.205'
   },
   {
     instanceId: 'i-0456789123',
     hostname: 'ip-192-168-0-148',
-    availabilityZone: 'ap-south-1a',
+    availabilityZone: 'ap-southeast-2a',
     privateIp: '192.168.0.148'
   }
 ];

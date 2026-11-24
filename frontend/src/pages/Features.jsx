@@ -20,10 +20,10 @@ export default function Features({ theme }) {
     try {
       await pingServer();
       const latency = Math.round(performance.now() - start);
-      setPingResult({ latency, status: '200 OK', region: 'ap-south-1' });
+      setPingResult({ latency, status: '200 OK', region: 'ap-southeast-2' });
     } catch (err) {
       const latency = Math.round(performance.now() - start);
-      setPingResult({ latency: Math.max(14, latency), status: '200 OK (Simulated)', region: 'ap-south-1' });
+      setPingResult({ latency: Math.max(14, latency), status: '200 OK (Simulated)', region: 'ap-southeast-2' });
     } finally {
       setPinging(false);
     }
@@ -37,8 +37,8 @@ export default function Features({ theme }) {
     } catch (err) {
       setServerInfo({
         instanceId: 'i-0123456789',
-        hostname: 'ip-10-0-1-25',
-        availabilityZone: 'ap-south-1a'
+        hostname: 'ip-192-168-0-135',
+        availabilityZone: 'ap-southeast-2a'
       });
     } finally {
       setLoadingInfo(false);

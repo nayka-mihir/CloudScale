@@ -1,7 +1,7 @@
 variable "aws_region" {
   description = "AWS Region to deploy CloudScale infrastructure"
   type        = string
-  default     = "ap-south-1"
+  default     = "ap-southeast-2"
 }
 
 variable "vpc_cidr" {
@@ -37,13 +37,13 @@ variable "subnet_priv_2_cidr" {
 variable "az_1" {
   description = "Primary Availability Zone"
   type        = string
-  default     = "ap-south-1a"
+  default     = "ap-southeast-2a"
 }
 
 variable "az_2" {
   description = "Secondary Availability Zone"
   type        = string
-  default     = "ap-south-1b"
+  default     = "ap-southeast-2b"
 }
 
 variable "instance_type" {

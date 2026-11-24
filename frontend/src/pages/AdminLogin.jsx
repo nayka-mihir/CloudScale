@@ -56,7 +56,7 @@ export default function AdminLogin({ onLoginSuccess, onCancel, triggerNotificati
           username: 'admin',
           role: 'AWS Infrastructure Administrator',
           accessLevel: 'Full Control (ASG, ALB, EFS, CloudWatch)',
-          region: 'ap-south-1',
+          region: 'ap-southeast-2',
           loginTime: new Date().toISOString()
         };
         const token = 'cs_fallback_adm_' + Math.random().toString(36).substring(2);

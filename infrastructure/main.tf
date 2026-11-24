@@ -44,7 +44,7 @@ resource "aws_internet_gateway" "igw" {
   }
 }
 
-# Public Subnet 1 (ap-south-1a)
+# Public Subnet 1 (ap-southeast-2a)
 resource "aws_subnet" "pub_1" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.subnet_1_cidr
@@ -56,7 +56,7 @@ resource "aws_subnet" "pub_1" {
   }
 }
 
-# Public Subnet 2 (ap-south-1b)
+# Public Subnet 2 (ap-southeast-2b)
 resource "aws_subnet" "pub_2" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.subnet_2_cidr
@@ -97,7 +97,7 @@ resource "aws_route_table_association" "pub_2" {
 # Private Subnets & NAT Gateway (Enterprise Defense-in-Depth for EC2 Nodes)
 # ------------------------------------------------------------------------------
 
-# Private Subnet 1 (ap-south-1a)
+# Private Subnet 1 (ap-southeast-2a)
 resource "aws_subnet" "priv_1" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.subnet_priv_1_cidr
@@ -109,7 +109,7 @@ resource "aws_subnet" "priv_1" {
   }
 }
 
-# Private Subnet 2 (ap-south-1b)
+# Private Subnet 2 (ap-southeast-2b)
 resource "aws_subnet" "priv_2" {
   vpc_id                  = aws_vpc.main.id
   cidr_block              = var.subnet_priv_2_cidr
@@ -285,6 +285,12 @@ resource "aws_iam_role" "ec2_role" {
 resource "aws_iam_role_policy_attachment" "cw_ro" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchReadOnlyAccess"
+}
+
+# AWS Systems Manager (SSM) Session Manager Policy Attachment
+resource "aws_iam_role_policy_attachment" "ssm_core" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
 # Custom Least-Privilege Policy for Auto-Scaling and Metrics API

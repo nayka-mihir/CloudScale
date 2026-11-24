@@ -4,8 +4,8 @@ Automated provisioning for the **CloudScale Multi-AZ High-Availability Auto-Scal
 
 ## What This Code Creates
 1. **Custom VPC (`192.168.0.0/24`)** with Internet Gateway.
-2. **2 Multi-AZ Public Subnets** (`192.168.0.0/26` in `ap-south-1a` & `192.168.0.64/26` in `ap-south-1b`) hosting the ALB and NAT Gateway.
-3. **2 Multi-AZ Private Subnets** (`192.168.0.128/26` in `ap-south-1a` & `192.168.0.192/26` in `ap-south-1b`) hosting isolated EC2 Auto Scaling instances.
+2. **2 Multi-AZ Public Subnets** (`192.168.0.0/26` in `ap-southeast-2a` & `192.168.0.64/26` in `ap-southeast-2b`) hosting the ALB and NAT Gateway.
+3. **2 Multi-AZ Private Subnets** (`192.168.0.128/26` in `ap-southeast-2a` & `192.168.0.192/26` in `ap-southeast-2b`) hosting isolated EC2 Auto Scaling instances.
 4. **NAT Gateway & Elastic IP** providing secure outbound connectivity for private EC2 instances.
 5. **Chained Security Groups** (`ALB SG` -> `EC2 SG`).
 6. **IAM Instance Profile** (`CloudWatchReadOnlyAccess` + ASG telemetry permissions).

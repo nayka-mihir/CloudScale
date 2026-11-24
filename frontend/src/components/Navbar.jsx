@@ -78,7 +78,7 @@ export default function Navbar({
                 ALB Ingress Active (Port 80/443)
               </span>
               <span className="text-xs text-gray-500 dark:text-slate-400 font-mono">
-                Region: <span className="text-slate-800 dark:text-slate-200">ap-south-1</span>
+                Region: <span className="text-slate-800 dark:text-slate-200">ap-southeast-2</span>
               </span>
             </div>
           )}
