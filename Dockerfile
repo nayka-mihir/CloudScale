@@ -16,7 +16,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=80
 ENV ADMIN_PORT=8080
-ENV SIMULATE_AWS=true
+ENV SIMULATE_AWS=false
+ENV AWS_REGION=ap-southeast-2
 ENV FRONTEND_DIST_PATH=/app/dist
 
 COPY --from=backend-builder /app/backend/node_modules ./backend/node_modules

@@ -94,10 +94,11 @@ setInterval(() => {
     // 1. Load test is NOT active
     // 2. Cooldown period (25s) has passed
     // 3. CPU is safely below 40% (32% hysteresis safety buffer)
-    // 4. Cluster is above minimum capacity (2)
+    // 4. Cluster is above floor capacity (respects manual capacity increases)
+    const floorCapacity = clusterState.manualDesired || clusterState.minCapacity;
     if (timeSinceLastScale > clusterState.scaleCooldownMs && 
         clusterState.currentCpu < 40 && 
-        clusterState.instances.length > clusterState.minCapacity) {
+        clusterState.instances.length > floorCapacity) {
       
       clusterState.instances.pop();
       clusterState.desiredCapacity = clusterState.instances.length;
@@ -143,16 +144,18 @@ export function adjustCapacity(action, value) {
   if (action === 'increase') {
     if (clusterState.desiredCapacity < clusterState.maxCapacity) {
       clusterState.desiredCapacity += 1;
+      clusterState.manualDesired = clusterState.desiredCapacity;
+      clusterState.lastScaleTime = Date.now();
       const az = clusterState.instances.length % 2 === 0 ? 'ap-southeast-2a' : 'ap-southeast-2b';
       const hex = Math.random().toString(16).substring(2, 12);
-      const octet = Math.floor(10 + Math.random() * 80);
+      const octet = Math.floor(130 + clusterState.instances.length * 18);
       clusterState.instances.push({
         id: `i-${hex}`,
         hostname: `ip-192-168-0-${octet}`,
         az,
         state: 'running',
         health: 'healthy',
-        cpu: 50,
+        cpu: 45,
         launchTime: new Date().toISOString()
       });
       return { success: true, desiredCapacity: clusterState.desiredCapacity, message: `Capacity increased to ${clusterState.desiredCapacity}` };
@@ -163,6 +166,8 @@ export function adjustCapacity(action, value) {
   if (action === 'decrease') {
     if (clusterState.desiredCapacity > clusterState.minCapacity) {
       clusterState.desiredCapacity -= 1;
+      clusterState.manualDesired = clusterState.desiredCapacity;
+      clusterState.lastScaleTime = Date.now();
       if (clusterState.instances.length > clusterState.minCapacity) {
         clusterState.instances.pop();
       }
@@ -172,6 +177,23 @@ export function adjustCapacity(action, value) {
   }
 
   throw new Error('Invalid capacity adjustment action');
+}
+
+export function syncRealAwsCluster(realStatus, realInstances) {
+  if (realStatus) {
+    if (typeof realStatus.desiredCapacity === 'number') {
+      clusterState.desiredCapacity = realStatus.desiredCapacity;
+    }
+    if (typeof realStatus.minCapacity === 'number') {
+      clusterState.minCapacity = realStatus.minCapacity;
+    }
+    if (typeof realStatus.maxCapacity === 'number') {
+      clusterState.maxCapacity = realStatus.maxCapacity;
+    }
+  }
+  if (Array.isArray(realInstances) && realInstances.length > 0) {
+    clusterState.instances = realInstances;
+  }
 }
 
 export function startStressTest() {

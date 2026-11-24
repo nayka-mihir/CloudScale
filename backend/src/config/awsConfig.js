@@ -9,8 +9,8 @@ export const awsConfig = {
   region: process.env.AWS_REGION || 'ap-southeast-2',
   asgName: process.env.AWS_ASG_NAME || 'cloudscale-asg',
   targetGroupArn: process.env.AWS_TARGET_GROUP_ARN || '',
-  // Force simulation mode if requested via env, or automatically fallback when no AWS credentials exist
-  simulateAws: process.env.SIMULATE_AWS === 'true' || (!process.env.AWS_ACCESS_KEY_ID && !process.env.AWS_EXECUTION_ENV)
+  // True only if explicitly set to 'true'. When false, AWS SDK communicates with live AWS APIs using EC2 IAM Role.
+  simulateAws: process.env.SIMULATE_AWS === 'true'
 };
 
 // Client configuration options

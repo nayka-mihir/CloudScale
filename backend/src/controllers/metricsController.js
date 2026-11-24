@@ -3,10 +3,24 @@ import {
   adjustCapacity, 
   startStressTest, 
   stopStressTest,
-  incrementRequestCount 
+  incrementRequestCount,
+  syncRealAwsCluster
 } from '../services/scalingService.js';
+import * as awsService from '../services/awsService.js';
+import { awsConfig } from '../config/awsConfig.js';
 
-export const getMetrics = (req, res) => {
+export const getMetrics = async (req, res) => {
+  if (!awsConfig.simulateAws) {
+    try {
+      const realStatus = await awsService.getInfrastructureStatus();
+      const realInst = await awsService.getInstanceMetrics();
+      if (realStatus && realInst?.instances?.length) {
+        syncRealAwsCluster(realStatus, realInst.instances);
+      }
+    } catch (e) {
+      console.warn(`[Metrics Sync] Real AWS sync warning: ${e.message}`);
+    }
+  }
   const metrics = getClusterMetrics();
   res.status(200).json(metrics);
 };
