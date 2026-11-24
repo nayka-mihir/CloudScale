@@ -5,8 +5,10 @@ const clusterState = {
   maxCapacity: 6,
   loadTestActive: false,
   stressTimeout: null,
-  currentCpu: 42,
-  currentRequests: 180,
+  lastScaleTime: 0,          // Timestamp of last scaling action (Scale-out or Scale-in)
+  scaleCooldownMs: 25000,    // 25-second stabilization cooldown window (prevents flapping)
+  currentCpu: 38,
+  currentRequests: 160,
   instances: [
     {
       id: 'i-07fc1d8338766d3b5',
@@ -14,7 +16,7 @@ const clusterState = {
       az: 'ap-southeast-2a',
       state: 'running',
       health: 'healthy',
-      cpu: 40,
+      cpu: 38,
       launchTime: new Date(Date.now() - 3600000 * 5).toISOString()
     },
     {
@@ -23,7 +25,7 @@ const clusterState = {
       az: 'ap-southeast-2b',
       state: 'running',
       health: 'healthy',
-      cpu: 44,
+      cpu: 40,
       launchTime: new Date(Date.now() - 3600000 * 4.2).toISOString()
     }
   ],
@@ -37,14 +39,17 @@ for (let i = 10; i >= 0; i--) {
   const timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   clusterState.history.push({
     timestamp: timeStr,
-    cpu: Math.floor(35 + Math.random() * 10),
-    requests: Math.floor(160 + Math.random() * 40),
+    cpu: Math.floor(35 + Math.random() * 8),
+    requests: Math.floor(150 + Math.random() * 30),
     healthyHosts: 2
   });
 }
 
 // Background simulation ticker
 setInterval(() => {
+  const currentTime = Date.now();
+  const timeSinceLastScale = currentTime - clusterState.lastScaleTime;
+
   if (clusterState.loadTestActive) {
     // Dynamic load sharing: as new instances join, load distributes
     // 2 instances: 22 + (115 / 2) = 79-82% -> Triggers scale out to 3
@@ -54,8 +59,14 @@ setInterval(() => {
     clusterState.currentCpu = Math.min(95, baseLoad + dynamicLoad + Math.floor(Math.random() * 4));
     clusterState.currentRequests = Math.floor(280 * clusterState.instances.length + Math.random() * 40);
 
-    // Auto-scaling trigger: ONLY scale if average CPU is still > 70%
-    if (clusterState.currentCpu > 70 && clusterState.instances.length < clusterState.maxCapacity) {
+    // Auto-scaling trigger:
+    // 1. Average CPU > 72%
+    // 2. Cooldown period (25s) has elapsed since last scaling event
+    // 3. Cluster is below max capacity
+    if (clusterState.currentCpu > 72 && 
+        timeSinceLastScale > clusterState.scaleCooldownMs && 
+        clusterState.instances.length < clusterState.maxCapacity) {
+      
       const azList = ['ap-southeast-2a', 'ap-southeast-2b'];
       const nextAz = azList[clusterState.instances.length % 2];
       const octet = Math.floor(130 + clusterState.instances.length * 18);
@@ -71,17 +82,26 @@ setInterval(() => {
       };
       clusterState.instances.push(newInst);
       clusterState.desiredCapacity = clusterState.instances.length;
+      clusterState.lastScaleTime = currentTime; // Lock scaling cooldown
     }
   } else {
-    // Steady state: maintain around 35-45%
-    const target = 36 + Math.floor(Math.random() * 8);
+    // Steady state: maintain around 34-42%
+    const target = 36 + Math.floor(Math.random() * 6);
     clusterState.currentCpu = Math.max(25, Math.floor(clusterState.currentCpu * 0.8 + target * 0.2));
-    clusterState.currentRequests = Math.max(120, Math.floor(clusterState.currentRequests * 0.85 + 160 * 0.15));
+    clusterState.currentRequests = Math.max(120, Math.floor(clusterState.currentRequests * 0.85 + 150 * 0.15));
 
-    // Auto-scale in: gracefully return to minCapacity (2)
-    if (clusterState.currentCpu < 50 && clusterState.instances.length > clusterState.minCapacity) {
+    // Auto-scale in: ONLY when:
+    // 1. Load test is NOT active
+    // 2. Cooldown period (25s) has passed
+    // 3. CPU is safely below 40% (32% hysteresis safety buffer)
+    // 4. Cluster is above minimum capacity (2)
+    if (timeSinceLastScale > clusterState.scaleCooldownMs && 
+        clusterState.currentCpu < 40 && 
+        clusterState.instances.length > clusterState.minCapacity) {
+      
       clusterState.instances.pop();
       clusterState.desiredCapacity = clusterState.instances.length;
+      clusterState.lastScaleTime = currentTime; // Lock scaling cooldown
     }
   }
 
@@ -98,7 +118,7 @@ setInterval(() => {
     requests: clusterState.currentRequests,
     healthyHosts: clusterState.instances.length
   });
-}, 4000);
+}, 3500);
 
 export function getClusterMetrics() {
   const healthyCount = clusterState.instances.filter(i => i.health === 'healthy').length;
@@ -175,13 +195,14 @@ export function startStressTest() {
 
 export function stopStressTest() {
   clusterState.loadTestActive = false;
+  clusterState.lastScaleTime = Date.now(); // Initialize cooldown on test stop
   if (clusterState.stressTimeout) {
     clearTimeout(clusterState.stressTimeout);
     clusterState.stressTimeout = null;
   }
   return {
     success: true,
-    message: 'Load test stopped. Cluster entering stabilization cooldown window.'
+    message: 'Load test stopped. Cluster entering 25-second stabilization cooldown window.'
   };
 }
 
