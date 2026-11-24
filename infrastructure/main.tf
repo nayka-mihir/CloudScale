@@ -419,24 +419,11 @@ resource "aws_lb_listener" "listener_8080" {
 }
 
 # ==============================================================================
-# 5. AMI DISCOVERY (Golden AMI or Amazon Linux 2023 Fallback)
+# 5. AMI DISCOVERY (Amazon Linux 2023 or Explicit var.ami_id)
 # ==============================================================================
 
-# Search for the user's custom Golden AMI if no ID is specified
-data "aws_ami" "custom_golden" {
-  count       = var.ami_id == "" ? 1 : 0
-  most_recent = true
-  owners      = ["self"]
-
-  filter {
-    name   = "name"
-    values = ["CloudScale-Golden-AMI-*"]
-  }
-}
-
-# Fallback to standard Amazon Linux 2023 if self Golden AMI not yet built
-data "aws_ami" "al2023_fallback" {
-  count       = var.ami_id == "" ? 1 : 0
+# Standard official Amazon Linux 2023 AMI
+data "aws_ami" "al2023" {
   most_recent = true
   owners      = ["amazon"]
 
@@ -447,12 +434,8 @@ data "aws_ami" "al2023_fallback" {
 }
 
 locals {
-  # Priority: 1. Explicit var.ami_id -> 2. Self Golden AMI -> 3. Amazon Linux 2023
-  resolved_ami_id = var.ami_id != "" ? var.ami_id : (
-    length(try(data.aws_ami.custom_golden[0].id, "")) > 0 ?
-    data.aws_ami.custom_golden[0].id :
-    data.aws_ami.al2023_fallback[0].id
-  )
+  # Use explicit var.ami_id if supplied, otherwise use official Amazon Linux 2023
+  resolved_ami_id = var.ami_id != "" ? var.ami_id : data.aws_ami.al2023.id
 }
 
 # ==============================================================================
