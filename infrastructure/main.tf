@@ -475,11 +475,38 @@ resource "aws_launch_template" "lt" {
     enabled = true
   }
 
-  # Cloud-Init User Data ensures Docker and containers auto-boot
+  # Cloud-Init User Data: Installs Docker, clones public repo, builds & runs container
   user_data = base64encode(<<-EOF
     #!/bin/bash
-    systemctl start docker
-    docker start cloudscale || docker run -d --name cloudscale --restart unless-stopped -p 80:80 -p 8080:8080 cloudscale-app:latest
+    exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+    echo "=== CloudScale Bootstrap Starting ==="
+
+    # 1. Update OS packages & install Docker + Git
+    dnf update -y
+    dnf install -y docker git
+    systemctl enable --now docker
+    usermod -aG docker ec2-user
+
+    # 2. Clone Public Repository if not already cloned
+    if [ ! -d "/home/ec2-user/CloudScale" ]; then
+      echo "Cloning CloudScale repository from GitHub..."
+      git clone https://github.com/nayka-mihir/CloudScale.git /home/ec2-user/CloudScale
+      chown -R ec2-user:ec2-user /home/ec2-user/CloudScale
+    fi
+
+    # 3. Build Docker container if image not present
+    cd /home/ec2-user/CloudScale
+    if [[ "$(docker images -q cloudscale-app:latest 2> /dev/null)" == "" ]]; then
+      echo "Building Docker image cloudscale-app:latest..."
+      docker build -t cloudscale-app:latest .
+    fi
+
+    # 4. Start Docker container
+    echo "Starting CloudScale application container..."
+    docker rm -f cloudscale 2>/dev/null || true
+    docker run -d --name cloudscale --restart unless-stopped -p 80:80 -p 8080:8080 cloudscale-app:latest
+
+    echo "=== CloudScale Bootstrap Completed Successfully ==="
   EOF
   )
 
@@ -509,7 +536,7 @@ resource "aws_autoscaling_group" "asg" {
   max_size         = var.max_capacity
 
   health_check_type         = "ELB"
-  health_check_grace_period = 180
+  health_check_grace_period = 300
 
   launch_template {
     id      = aws_launch_template.lt.id
@@ -522,7 +549,11 @@ resource "aws_autoscaling_group" "asg" {
     propagate_at_launch = true
   }
 
-  depends_on = [aws_nat_gateway.nat_gw]
+  depends_on = [
+    aws_nat_gateway.nat_gw,
+    aws_route_table_association.priv_1,
+    aws_route_table_association.priv_2
+  ]
 
   lifecycle {
     create_before_destroy = true
@@ -531,15 +562,15 @@ resource "aws_autoscaling_group" "asg" {
 
 # Target Tracking Scaling Policy (Average CPU > 70%)
 resource "aws_autoscaling_policy" "cpu_target_tracking" {
-  name                   = "cloudscale-cpu-target-tracking"
-  autoscaling_group_name = aws_autoscaling_group.asg.name
-  policy_type            = "TargetTrackingScaling"
+  name                      = "cloudscale-cpu-target-tracking"
+  autoscaling_group_name    = aws_autoscaling_group.asg.name
+  policy_type               = "TargetTrackingScaling"
+  estimated_instance_warmup = 180
 
   target_tracking_configuration {
     predefined_metric_specification {
       predefined_metric_type = "ASGAverageCPUUtilization"
     }
-    target_value     = var.cpu_target_threshold
-    estimated_instance_warmup = 180
+    target_value = var.cpu_target_threshold
   }
 }
