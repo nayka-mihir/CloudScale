@@ -6,7 +6,9 @@ import {
   startLoadTest, 
   stopLoadTest, 
   handleContact, 
-  ping 
+  ping,
+  handleInternalStressStart,
+  handleInternalStressStop
 } from '../controllers/metricsController.js';
 import {
   getInfrastructureStatus,
@@ -55,5 +57,7 @@ router.get('/metrics', getMetrics);
 router.post('/capacity', updateCapacity);
 router.post('/load-test/start', startLoadTest);
 router.post('/load-test/stop', stopLoadTest);
+router.post('/internal/stress/start', handleInternalStressStart);
+router.post('/internal/stress/stop', handleInternalStressStop);
 
 export default router;

@@ -352,3 +352,58 @@ export async function getInstanceMetrics() {
     };
   }
 }
+
+/**
+ * Broadcast stress command across all running nodes in the AWS Auto Scaling Group.
+ * This ensures all EC2 instances burn CPU simultaneously so ASGAverageCPUUtilization crosses 70%.
+ */
+export async function broadcastStressToCluster(action = 'start', durationSeconds = 300) {
+  if (awsConfig.simulateAws) return;
+
+  try {
+    const asgName = await getRealAsgName();
+    const asgCmd = new DescribeAutoScalingGroupsCommand({ AutoScalingGroupNames: [asgName] });
+    const asgRes = await autoScalingClient.send(asgCmd);
+    const asg = asgRes.AutoScalingGroups?.[0];
+    if (!asg || !asg.Instances?.length) return;
+
+    const instanceIds = asg.Instances
+      .filter(i => i.LifecycleState === 'InService')
+      .map(i => i.InstanceId);
+    if (!instanceIds.length) return;
+
+    const ec2Cmd = new DescribeInstancesCommand({ InstanceIds: instanceIds });
+    const ec2Res = await ec2Client.send(ec2Cmd);
+
+    const peerIps = [];
+    (ec2Res.Reservations || []).forEach(r => {
+      (r.Instances || []).forEach(inst => {
+        if (inst.State?.Name === 'running' && inst.PrivateIpAddress) {
+          peerIps.push(inst.PrivateIpAddress);
+        }
+      });
+    });
+
+    console.log(`[AWS Service] Broadcasting stress '${action}' to ${peerIps.length} peer nodes:`, peerIps);
+
+    // Concurrently trigger internal stress endpoint on all peers
+    await Promise.allSettled(
+      peerIps.map(async (ip) => {
+        try {
+          const url = `http://${ip}:80/api/internal/stress/${action}`;
+          await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ durationSeconds }),
+            signal: AbortSignal.timeout(2500)
+          });
+        } catch (err) {
+          // Ignore individual peer timeouts (e.g. self or booting node)
+        }
+      })
+    );
+  } catch (err) {
+    console.warn(`[AWS Service] Broadcast stress warning: ${err.message}`);
+  }
+}
+

@@ -196,22 +196,22 @@ export function syncRealAwsCluster(realStatus, realInstances) {
   }
 }
 
-export function startStressTest() {
+export function startStressTest(durationSeconds = 300) {
   if (clusterState.loadTestActive) return { success: true, message: 'Load test already active' };
 
   clusterState.loadTestActive = true;
-  clusterState.currentCpu = 78;
-  clusterState.currentRequests = 560;
+  clusterState.currentCpu = 88;
+  clusterState.currentRequests = 580;
 
-  // Safety auto-stop after 90 seconds so load tests don't run indefinitely
+  // Safety auto-stop after durationSeconds (default 300s / 5 mins) so load tests don't run indefinitely
   if (clusterState.stressTimeout) clearTimeout(clusterState.stressTimeout);
   clusterState.stressTimeout = setTimeout(() => {
     stopStressTest();
-  }, 90000);
+  }, (durationSeconds || 300) * 1000);
 
   return {
     success: true,
-    message: 'High load test started: Simulated compute spike triggers CloudWatch scale-out evaluation (>70%).'
+    message: 'High load test started: Real physical compute spike triggers CloudWatch scale-out evaluation (>70%).'
   };
 }
 
