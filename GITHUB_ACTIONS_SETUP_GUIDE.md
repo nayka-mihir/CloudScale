@@ -10,13 +10,14 @@ Every time you `git push` code to the `main` branch, the pipeline automatically:
 
 ```mermaid
 flowchart LR
-    A["1. Code Check\n(Build frontend & backend)"] --> B["2. Build Multi-Stage Docker\n(GitHub fast runners)"]
-    B --> C["3. Push to Amazon ECR\n(Tagged latest & SHA)"]
-    C --> D["4. Deploy to Cluster\n(Via AWS SSM zero-downtime)"]
+    A["1. Code Check\n(Build frontend & backend)"] --> B["2. ECR Health Check\n(Auto-creates repo if missing)"]
+    B --> C["3. Build Multi-Stage Docker\n(GitHub fast runners)"]
+    C --> D["4. Push to Amazon ECR\n(Tagged latest & SHA)"]
+    D --> E["5. Deploy to Cluster\n(Via AWS SSM zero-downtime)"]
 ```
 
 1. **Continuous Integration (Test & Build):** Validates that backend and frontend code build without errors.
-2. **Containerization (Amazon ECR):** Builds the production Docker image and pushes it to private AWS ECR.
+2. **Resilient Containerization (Amazon ECR):** Automatically checks if the private Amazon ECR repository exists. If your Terraform infrastructure has not been applied yet or was destroyed to save costs, **GitHub Actions creates the ECR repository automatically on the fly** with vulnerability scanning enabled!
 3. **Continuous Deployment (Rolling Zero-Downtime Update):** Uses AWS Systems Manager (SSM) to tell all running EC2 instances to pull the new image and restart the container in seconds. If the cluster is currently stopped or destroyed, it safely stores the image in ECR so that any newly launched instances get it automatically on boot!
 
 ---

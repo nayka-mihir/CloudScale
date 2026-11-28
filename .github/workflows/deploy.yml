@@ -66,6 +66,22 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Ensure Amazon ECR Repository Exists (Auto-Provision if Missing)
+        run: |
+          echo "=== Checking if Amazon ECR repository '$ECR_REPOSITORY' exists ==="
+          if ! aws ecr describe-repositories --region ${{ env.AWS_REGION }} --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1; then
+            echo "⚠️ Repository '$ECR_REPOSITORY' not found. Creating automatically..."
+            aws ecr create-repository \
+              --region ${{ env.AWS_REGION }} \
+              --repository-name "$ECR_REPOSITORY" \
+              --image-tag-mutability MUTABLE \
+              --image-scanning-configuration scanOnPush=true \
+              --tags Key=Project,Value=CloudScale Key=ManagedBy,Value=GitHubActions
+            echo "✅ Successfully created Amazon ECR repository: $ECR_REPOSITORY"
+          else
+            echo "✅ Amazon ECR repository '$ECR_REPOSITORY' already exists and is ready."
+          fi
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
