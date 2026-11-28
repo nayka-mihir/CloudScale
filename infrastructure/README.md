@@ -1,52 +1,67 @@
-# CloudScale Infrastructure as Code (Terraform)
+# CloudScale Multi-Tier Infrastructure Architecture (Enterprise Pattern A)
 
-Automated provisioning for the **CloudScale Multi-AZ High-Availability Auto-Scaling Cluster** on AWS.
+This directory follows **Enterprise Multi-Tier Lifecycle Architecture**. Infrastructure is split into two independent modules so that your Docker registry remains alive permanently at $0.00/hour, while your expensive compute resources (EC2, NAT Gateway, ALB) can be destroyed and recreated whenever you want to save 100% on cloud costs.
 
-## What This Code Creates
-1. **Custom VPC (`192.168.0.0/24`)** with Internet Gateway.
-2. **2 Multi-AZ Public Subnets** (`192.168.0.0/26` in `ap-southeast-2a` & `192.168.0.64/26` in `ap-southeast-2b`) hosting the ALB and NAT Gateway.
-3. **2 Multi-AZ Private Subnets** (`192.168.0.128/26` in `ap-southeast-2a` & `192.168.0.192/26` in `ap-southeast-2b`) hosting isolated EC2 Auto Scaling instances.
-4. **NAT Gateway & Elastic IP** providing secure outbound connectivity for private EC2 instances.
-5. **Chained Security Groups** (`ALB SG` -> `EC2 SG`).
-6. **IAM Instance Profile** (`CloudWatchReadOnlyAccess` + ASG telemetry permissions).
-7. **Application Load Balancer** with dual listeners:
-   - Port `80` -> Forward to `tg-cloudscale-80`
-   - Port `8080` -> Forward to `tg-cloudscale-8080`
-8. **EC2 Launch Template** with Golden AMI & container auto-boot User Data.
-9. **Auto Scaling Group** in Private Subnets with Target Tracking Policy (Average CPU > 70%).
+---
 
-## Quick Start
+## Architecture Overview
 
-### 1. Configure Credentials
-```bash
-aws configure
+```
+infrastructure/
+├── 01-base/                  <-- APPLIED ONCE (Never Destroyed)
+│   ├── main.tf               (Amazon ECR Registry & Lifecycle Policies)
+│   ├── variables.tf
+│   └── outputs.tf
+│
+└── 02-compute/               <-- DYNAMIC (Apply when working, Destroy to save $)
+    ├── main.tf               (VPC, Subnets, NAT Gateway, ALB, ASG, EC2)
+    ├── variables.tf
+    └── outputs.tf
 ```
 
-### 2. (Optional) Custom Settings
-Copy the example variables file:
-```bash
-cp terraform.tfvars.example terraform.tfvars
-```
-Edit `terraform.tfvars` if you want to set your specific `ami_id` or `key_name`.
+---
 
-### 3. Initialize & Deploy
+## 1. `01-base` — Foundation Layer (Run ONCE)
+
+- **What it creates:** Amazon ECR Private Container Registry (`cloudscale-app`) with automatic vulnerability scanning on push and 10-image retention lifecycle policy.
+- **Cost when running / idle:** **$0.00 / hour** (Costs nothing to keep alive).
+- **Lifecycle:** Apply once. **Never destroy.**
+
+### Commands:
 ```bash
-cd infrastructure
+cd infrastructure/01-base
 terraform init
-terraform plan
-terraform apply -auto-approve
+terraform apply
 ```
 
-### 4. View Outputs
-At the end of the run, Terraform prints your live endpoints:
-- `public_website_url`: `http://<ALB_DNS>`
-- `admin_dashboard_url`: `http://<ALB_DNS>:8080`
+---
 
-### 5. Cost Control & Teardown
+## 2. `02-compute` — Compute & Networking Layer (Ephemeral)
+
+- **What it creates:** Custom VPC (`192.168.0.0/24`), Public & Private Subnets, NAT Gateway, Application Load Balancer, EC2 Auto-Scaling Group, Target Tracking Policy (CPU > 70%), and IAM Roles.
+- **Dynamic Discovery (Option A):** Uses `data "aws_ecr_repository" "app"` to dynamically query the ECR repository created by `01-base` without needing complex remote state!
+- **Cost when running:** ~$2.20 / day (NAT Gateway + ALB + 2x t3.micro EC2).
+- **Lifecycle:** Apply when you want to run tests or demos. **Destroy when you want to stop paying.**
+
+### To Start the Cluster:
 ```bash
-# To pause nodes without destroying the ALB/VPC:
-terraform apply -var="desired_capacity=0" -var="min_capacity=0"
-
-# To delete everything completely:
-terraform destroy -auto-approve
+cd infrastructure/02-compute
+terraform init
+terraform apply
 ```
+
+### To Destroy the Cluster & Save 100% on Costs:
+```bash
+cd infrastructure/02-compute
+terraform destroy
+```
+*(Your VPC, ALB, NAT Gateway, and EC2 instances are deleted, returning billing to $0.00, while your built Docker images in `01-base` remain 100% safe!)*
+
+---
+
+## 3. Comparison of Lifecycles
+
+| Layer | Resources | Hourly Cost | Destroy Frequency | Impact on CI/CD |
+|---|---|---|---|---|
+| **`01-base`** | Amazon ECR | **$0.00 / hr** | **Never** | GitHub Actions can push Docker images 24/7 without fail. |
+| **`02-compute`** | VPC, NAT, ALB, ASG, EC2 | **~$0.09 / hr** | **Destroy when idle** | Can be torn down and recreated in ~3 minutes without losing images. |
