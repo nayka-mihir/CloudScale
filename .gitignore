@@ -31,9 +31,9 @@ pnpm-debug.log*
 *.sln
 *.sw?
 
-# OS generated files
-.DS_Store
-Thumbs.db
+# Presentation assets
+_ppt_assets/
+*.pptx
 
 # Terraform
 **/.terraform/

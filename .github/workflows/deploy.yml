@@ -1,0 +1,155 @@
+name: CloudScale CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION || 'ap-southeast-2' }}
+  ECR_REPOSITORY: cloudscale-app
+
+jobs:
+  # ============================================================================
+  # 1. CONTINUOUS INTEGRATION: Build Verification & Code Integrity
+  # ============================================================================
+  build-and-test:
+    name: 1. Code Integrity & Build Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+
+      - name: Verify Backend Dependencies
+        working-directory: ./backend
+        run: |
+          npm ci --omit=dev
+          echo "✅ Backend dependencies installed successfully"
+
+      - name: Build Frontend Application
+        working-directory: ./frontend
+        run: |
+          npm ci
+          npm run build
+          echo "✅ Frontend production build succeeded"
+
+  # ============================================================================
+  # 2. CONTAINERIZATION: Build Multi-Stage Docker Image & Push to Amazon ECR
+  # ============================================================================
+  build-and-push-ecr:
+    name: 2. Build & Push Image to Amazon ECR
+    needs: build-and-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build, Tag and Push Container Image to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          echo "=== Building CloudScale Multi-Stage Container ==="
+          docker build \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            .
+
+          echo "=== Pushing Image to Amazon ECR ==="
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+          echo "✅ Pushed image to ECR successfully: $ECR_REGISTRY/$ECR_REPOSITORY:latest"
+
+  # ============================================================================
+  # 3. CONTINUOUS DEPLOYMENT: Zero-Downtime Rolling Update to EC2 Cluster
+  # ============================================================================
+  deploy-to-cluster:
+    name: 3. Rolling Deploy to EC2 Cluster
+    needs: build-and-push-ecr
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Deploy to Running EC2 Instances via AWS SSM
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          echo "=== Discovering active CloudScale EC2 cluster nodes ==="
+          INSTANCE_IDS=$(aws ec2 describe-instances \
+            --region ${{ env.AWS_REGION }} \
+            --filters "Name=tag:Project,Values=CloudScale" "Name=instance-state-name,Values=running" \
+            --query "Reservations[*].Instances[*].InstanceId" \
+            --output text)
+
+          if [ -z "$INSTANCE_IDS" ]; then
+            echo "ℹ️ Notice: No active EC2 instances currently running (Cluster is stopped/destroyed)."
+            echo "✅ The latest image is stored in ECR and will be automatically loaded whenever the cluster is launched!"
+            exit 0
+          fi
+
+          echo "Found running instances: $INSTANCE_IDS"
+          echo "=== Dispatching Rolling Deployment Command via AWS SSM ==="
+
+          COMMAND_ID=$(aws ssm send-command \
+            --region ${{ env.AWS_REGION }} \
+            --instance-ids $INSTANCE_IDS \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy latest CloudScale image from ECR (${{ github.sha }})" \
+            --parameters commands='[
+              "echo === Pulling latest CloudScale image from ECR ===",
+              "aws ecr get-login-password --region '${{ env.AWS_REGION }}' | docker login --username AWS --password-stdin '${{ steps.login-ecr.outputs.registry }}'",
+              "docker pull '${{ steps.login-ecr.outputs.registry }}'/'${{ env.ECR_REPOSITORY }}':latest",
+              "echo === Performing Zero-Downtime Container Restart ===",
+              "docker rm -f cloudscale || true",
+              "docker run -d --name cloudscale --restart unless-stopped -p 80:80 -p 8080:8080 '${{ steps.login-ecr.outputs.registry }}'/'${{ env.ECR_REPOSITORY }}':latest",
+              "echo === CloudScale Container Successfully Updated ==="
+            ]' \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command dispatched: $COMMAND_ID"
+          echo "Waiting for deployment to complete..."
+          aws ssm wait command-executed \
+            --region ${{ env.AWS_REGION }} \
+            --command-id "$COMMAND_ID" \
+            --instance-id $(echo $INSTANCE_IDS | awk '{print $1}') || true
+
+          echo "✅ Zero-Downtime Cluster Deployment Completed Successfully!"

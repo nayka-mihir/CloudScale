@@ -338,6 +338,12 @@ resource "aws_iam_role_policy_attachment" "asg_attach" {
   policy_arn = aws_iam_policy.asg_policy.arn
 }
 
+# Amazon ECR Read-Only Policy Attachment for EC2 Nodes
+resource "aws_iam_role_policy_attachment" "ecr_ro" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+}
+
 resource "aws_iam_instance_profile" "ec2_profile" {
   name = "CloudScale-EC2-Instance-Profile"
   role = aws_iam_role.ec2_role.name
@@ -468,6 +474,24 @@ locals {
 }
 
 # ==============================================================================
+# 5b. CONTAINER REGISTRY (Amazon ECR)
+# ==============================================================================
+
+resource "aws_ecr_repository" "app" {
+  name                 = "cloudscale-app"
+  image_tag_mutability = "MUTABLE"
+  force_delete         = true
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = {
+    Name = "cloudscale-app-ecr"
+  }
+}
+
+# ==============================================================================
 # 6. EC2 LAUNCH TEMPLATE
 # ==============================================================================
 
@@ -487,7 +511,7 @@ resource "aws_launch_template" "lt" {
     enabled = true
   }
 
-  # Cloud-Init User Data: Installs Docker, clones public repo, builds & runs container
+  # Cloud-Init User Data: Installs Docker, pulls pre-built image from ECR (or builds fallback)
   user_data = base64encode(<<-EOF
     #!/bin/bash
     exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
@@ -495,28 +519,34 @@ resource "aws_launch_template" "lt" {
 
     # 1. Update OS packages & install Docker + Git
     dnf update -y
-    dnf install -y docker git
+    dnf install -y docker git aws-cli
     systemctl enable --now docker
     usermod -aG docker ec2-user
 
-    # 2. Clone Public Repository if not already cloned
-    if [ ! -d "/home/ec2-user/CloudScale" ]; then
-      echo "Cloning CloudScale repository from GitHub..."
-      git clone https://github.com/nayka-mihir/CloudScale.git /home/ec2-user/CloudScale
-      chown -R ec2-user:ec2-user /home/ec2-user/CloudScale
-    fi
-
-    # 3. Build Docker container if image not present
-    cd /home/ec2-user/CloudScale
-    if [[ "$(docker images -q cloudscale-app:latest 2> /dev/null)" == "" ]]; then
-      echo "Building Docker image cloudscale-app:latest..."
+    # 2. Authenticate and pull pre-built image from Amazon ECR (Fast ~20-30s)
+    ECR_URL="${aws_ecr_repository.app.repository_url}"
+    AWS_REGION="${var.aws_region}"
+    echo "Attempting to pull from Amazon ECR ($ECR_URL)..."
+    
+    if aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_URL && docker pull $ECR_URL:latest; then
+      echo "=== Successfully pulled pre-built image from ECR ==="
+      IMAGE_TO_RUN="$ECR_URL:latest"
+    else
+      echo "=== ECR pull not available, falling back to Git clone & local build ==="
+      if [ ! -d "/home/ec2-user/CloudScale" ]; then
+        echo "Cloning CloudScale repository from GitHub..."
+        git clone https://github.com/nayka-mihir/CloudScale.git /home/ec2-user/CloudScale
+        chown -R ec2-user:ec2-user /home/ec2-user/CloudScale
+      fi
+      cd /home/ec2-user/CloudScale
       docker build -t cloudscale-app:latest .
+      IMAGE_TO_RUN="cloudscale-app:latest"
     fi
 
-    # 4. Start Docker container
-    echo "Starting CloudScale application container..."
+    # 3. Start CloudScale Container
+    echo "Starting CloudScale application container with $IMAGE_TO_RUN..."
     docker rm -f cloudscale 2>/dev/null || true
-    docker run -d --name cloudscale --restart unless-stopped -p 80:80 -p 8080:8080 cloudscale-app:latest
+    docker run -d --name cloudscale --restart unless-stopped -p 80:80 -p 8080:8080 $IMAGE_TO_RUN
 
     echo "=== CloudScale Bootstrap Completed Successfully ==="
   EOF

@@ -47,3 +47,19 @@ output "nat_gateway_public_ip" {
   description = "Public Elastic IP assigned to NAT Gateway"
   value       = aws_eip.nat_eip.public_ip
 }
+
+output "ecr_repository_url" {
+  description = "Amazon ECR Repository URL"
+  value       = aws_ecr_repository.app.repository_url
+}
+
+output "target_group_80_arn" {
+  description = "Target Group ARN for Port 80"
+  value       = aws_lb_target_group.tg_80.arn
+}
+
+output "target_group_8080_arn" {
+  description = "Target Group ARN for Port 8080"
+  value       = aws_lb_target_group.tg_8080.arn
+}
+
